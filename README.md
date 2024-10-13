@@ -1,7 +1,7 @@
 # Chat-UbuntuLlama
-- Converting project for intended use on Ubuntu. 
+- Converting project for intended use on Ubuntu. Still Getting the scripts done currently.
 - Below is old content, that will be in some stage of update in project conversion from Chat-VulkanLlama...
-- Still Getting the scripts done currently...
+
 
 ```
 # CURRENT STATUS: Development... 
