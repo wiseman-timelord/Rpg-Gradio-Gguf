@@ -69,4 +69,4 @@
 ```
 
 ### Notes:
-- Its not possible to create bash scripts over batch scripts, bash scripts must be made in linux from the start, or they wont execute correctly.
+- Its not possible to convert batch scripts into bash scripts over the original file; bash scripts must be made in linux from the start, or they wont execute correctly.
