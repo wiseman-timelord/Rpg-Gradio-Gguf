@@ -12,10 +12,10 @@ echo "Running with Admin rights."
 PYTHON_EXE_TO_USE=$(which python3)
 PIP_EXE_TO_USE=$(which pip3)
 REQUIRED_LIBRARIES=(
-    "llama-cpp-python--"
-    "plotly--"
-    "watchdog--"
-    "pyyaml--"
+    "llama-cpp-python--0.3.1"
+    "plotly--5.17.0"
+    "watchdog--3.0.0"
+    "pyyaml--6.0.2"
 )
 
 # Initialization Block
@@ -27,9 +27,9 @@ if [[ -z "$PYTHON_EXE_TO_USE" ]]; then
 fi
 
 # Custom Banner
-echo "*******************************************************************************************************************"
-echo "                                          Chat-UbuntuLLama - Installer"
-echo "*******************************************************************************************************************"
+echo "********************************************************************************"
+echo "    Chat-UbuntuLLama - Installer"
+echo "********************************************************************************"
 echo
 echo "Working Dir: $ScriptDirectory"
 echo
@@ -76,7 +76,7 @@ done
 
 # Install llama-cpp-python with specific flags for AMD AVX2 and non-ROCm AMDGPU
 echo "Installing llama-cpp-python with specific flags for AMD AVX2 and non-ROCm AMDGPU..."
-pip install llama-cpp-python --force-reinstall --no-binary :all: --config-settings CMAKE_ARGS="-DLLAMA_AVX2=ON -DLLAMA_CLBLAST=OFF"
+pip install llama-cpp-python==0.3.1 --no-binary :all: --config-settings CMAKE_ARGS="-DLLAMA_AVX2=ON -DLLAMA_CLBLAST=OFF"
 
 # Install OpenCL and Vulkan Drivers
 echo "Installing OpenCL and Vulkan Drivers..."
@@ -86,3 +86,4 @@ sudo apt install -y mesa-opencl-icd vulkan-tools
 echo
 echo "Installation Processes Completed Normally."
 exit 0
+
