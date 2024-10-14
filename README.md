@@ -67,3 +67,6 @@
 ## DISCLAIMER:
 - Refer to License.Txt for terms covering usage, distribution, and modifications.
 ```
+
+### Notes:
+- Its not possible to create bash scripts over batch scripts, bash scripts must be made in linux from the start, or they wont execute correctly.
