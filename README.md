@@ -1,8 +1,12 @@
 # Chat-UbuntuLlama
-- Converting project for intended use on Ubuntu. Still Getting the scripts done currently.
+- Converting windows python chatbot, to optimized use on Ubuntu. Still Getting the scripts done currently.
+
+### Planner:
 - It will be optimized towards AVX2 and Non-Rocm AMDGPU, at least to start with.
 - It will feature better libraries, only available on linux python.
 - a new optional window for data visualization using plotly. I should use a gradio interface for the chat interactions, while engine window remains straight terminal.
+
+### Details:
 - Below is old content, that will be in some stage of update in project conversion from Chat-VulkanLlama...
 
 
