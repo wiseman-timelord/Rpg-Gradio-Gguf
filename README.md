@@ -2,12 +2,13 @@
 - Converting windows python chatbot, to optimized use on Ubuntu. Still Getting the scripts done currently.
 
 ### Planner:
-1. Programmed towards Ubuntu 24 with Venv.
-2. Programmed towards CPU, for simpler memory management.
-3. Programmed towards Gguf models only, maintained in "./models".
-4. A text window and a graphical window.
-- gradio interface for the chat interface.
-- Engine window as terminal with library output shown and any necessary debug info.](https://x.com/WisemanTimelord/verified_followers)
+- it has had a name change, which is correct in the bash file.
+- Programmed towards Ubuntu 24 with Venv.
+- Programmed towards CPU, for simpler memory management. there will be no use of, opencl or vulkan, or gpu for now.
+- Programmed towards Gguf models only, maintained in "./models", eg, "./models/examplename.gguf". the program needs to scan this folder upon start, and there should be some kind of selection of models.
+- A text window and a graphical window. gradio interface for the chat interface. Engine window as terminal with library output shown and any necessary debug info.
+- additional scripts are generated as required, and placed in data folder, such as the json, but we want a maximum of 5 python scripts between "./" and "./scripts", for the program that is launched after the bash file has run the main program.
+- the terminal should be used to maximum advantage before loading the gradio interface, checking relevant folders for required files, creating additional files as required.
 
 
 ### Details:
