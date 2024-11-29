@@ -2,9 +2,11 @@
 - Converting windows python chatbot, to optimized use on Ubuntu. Still Getting the scripts done currently.
 
 ### Planner:
-- It will be optimized towards AVX2 and Non-Rocm AMDGPU, at least to start with.
-- It will feature better libraries, only available on linux python.
-- a new optional window for data visualization using plotly. I should use a gradio interface for the chat interactions, while engine window remains straight terminal.
+1. Programmed towards Ubuntu 24 with Venv.
+2. Programmed towards CPU, for simpler memory management.
+3. A text window and a graphical window.
+- gradio interface for the chat interface.
+- Engine window as terminal with library output shown and any necessary debug info.
 
 ### Details:
 - Below is old content, that will be in some stage of update in project conversion from Chat-VulkanLlama...
