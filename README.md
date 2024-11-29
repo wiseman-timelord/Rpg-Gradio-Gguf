@@ -7,7 +7,7 @@
 3. Programmed towards Gguf models only, maintained in "./models".
 4. A text window and a graphical window.
 - gradio interface for the chat interface.
-- Engine window as terminal with library output shown and any necessary debug info.
+- Engine window as terminal with library output shown and any necessary debug info.](https://x.com/WisemanTimelord/verified_followers)
 
 
 ### Details:
