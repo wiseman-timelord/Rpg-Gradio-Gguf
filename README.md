@@ -1,8 +1,8 @@
-# Chat-UbuntuLlama
+# Chat-Ubuntu-Gguf
 - Converting windows python chatbot, to optimized use on Ubuntu. Still Getting the scripts done currently.
 
 ### Planner:
-- it has had a name change, which is correct in the bash file.
+- it has had a name change to "Chat-UbuntuLlama", which is correct in the bash file.
 - Programmed towards Ubuntu 24 with Venv.
 - Programmed towards CPU, for simpler memory management. there will be no use of, opencl or vulkan, or gpu for now.
 - Programmed towards Gguf models only, maintained in "./models", eg, "./models/examplename.gguf". the program needs to scan this folder upon start, and there should be some kind of selection of models.
