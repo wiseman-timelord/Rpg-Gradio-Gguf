@@ -4,9 +4,11 @@
 ### Planner:
 1. Programmed towards Ubuntu 24 with Venv.
 2. Programmed towards CPU, for simpler memory management.
-3. A text window and a graphical window.
+3. Programmed towards Gguf models only, maintained in "./models".
+4. A text window and a graphical window.
 - gradio interface for the chat interface.
 - Engine window as terminal with library output shown and any necessary debug info.
+
 
 ### Details:
 - Below is old content, that will be in some stage of update in project conversion from Chat-VulkanLlama...
