@@ -3,9 +3,6 @@
 
 ### Project Details
 The Reinvention of my WSL based ChatBot....
-- This one will start off simple but innovative, then expand from there. 
-- Decision to integrate gradio from the start, thus freed up a script.
-- Programmed towards Ubuntu 24 with Venv.
 - Programmed towards CPU, for simpler memory management. there will be no use of, opencl or vulkan, or gpu for now.
 - windows merged; by using gradio interface, removed window_2. and Window 1 became main_script. Window_2 will now be the "./scripts/interface.py" including, text and gradio interface, gradio interface displaying in the popup browser window.
 - Programmed towards Gguf models only, maintained in "./models"; The model must now have a relating "./models/model_config.json" (useually supplied with the model). the program needs to scan this folder upon start, and utilize whatever model is there.
@@ -22,7 +19,7 @@ The Reinvention of my WSL based ChatBot....
 - Optimized code, 5 main scripts, creation of required folders.
 - Running only with single GGUF model, featuring llama python.
 - Terminal and Gradio interface.
-- Memory Awareness and Optimized threading, for handle model.
+- Memory Awareness and Optimized threading.
 - Continuous interactive user loop in Gradio Interface.
 - Intelligent, context-aware response generation with summary.
 - YAML state management for persistent settings, names and roles.
@@ -39,6 +36,7 @@ The Reinvention of my WSL based ChatBot....
 - Ubuntu - Its programmed on/towards Ubuntu 24.04-24.10.
 - Python - It uses modern versions of Python in a VENV.
 - LLMs in GGUF format; testing on "Llama-3.1-Unhinged-Vision-8B-GGUF".
+- AMD - Programmed on AMD, not tested on other platforms.
 
 ### Usage
 - No working version verified yet.
