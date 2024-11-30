@@ -1,167 +1,158 @@
 # .\scripts\interface.py
 
-# imports
-from scripts import utility
-from scripts.utility import fancy_delay
-import os
+from scripts.utility import reset_session_state, write_to_yaml
+from data.params.temporary import session_history, agent_output, agent_name, agent_role, human_name
+import gradio as gr
+import threading
 import time
-import sys
-import glob
-import re
+import signal
+import os
 
-# Function to display intro screen
-def display_intro_screen():
-    os.system('clear') 
-    print("=" * 90)
-    print("    Welcome To Chat-VulkanLlama!")
-    print("=" * 90)
-    utility.trigger_sound_event("startup_process")
-    print("=-" * 45)    
-    print("=-" * 45, "=-" * 44)
-    print("    Startup Processes:")
-    print("-" * 90)
-    print("")  
-    utility.calculate_optimal_threads()
-    return utility.clear_debug_logs()
+def simulate_processing(delay=3):
+    """
+    Simulates processing time for AI response generation.
+    """
+    time.sleep(delay)
 
-# Select Model
-def select_model(models, agent_type):
-    if len(models) == 1:
-        return models[0]
-    elif len(models) > 1:
-        print(f"\nAvailable {agent_type} models:")
-        for i, model in enumerate(models):
-            print(f"{i+1}. {os.path.basename(model)}")
-        selected = input(f"Select a {agent_type} model by entering its number: ")
-        if selected.isdigit() and 0 < int(selected) <= len(models):
-            return models[int(selected) - 1]
-        else:
-            print(f"Invalid selection for {agent_type}.")
-            return None
-    return None
+def shutdown():
+    """
+    Gracefully shuts down the application.
+    """
+    print("Shutting down the application...")
+    os.kill(os.getpid(), signal.SIGTERM)
 
-# Process Selected model
-def process_selected_model(agent_type, model_path, idx):
-    if model_path:
-        agent_name = os.path.basename(model_path)
-        context_key = utility.extract_context_key_from_model_name(agent_name)
-        print(f" {agent_type.capitalize()} model is {agent_name} - CTX {context_key}")
-        utility.trigger_sound_event("model_used")
-        selected_syntax = display_syntax_selection()
-        if selected_syntax:
-            utility.write_to_yaml(f'syntax_type_{idx}', selected_syntax)
-            utility.write_to_yaml(f'model_path_{idx}', model_path)
-            utility.write_to_yaml(f'context_length_{idx}', CONTEXT_LENGTH_MAP[agent_type].get(context_key, 4096))
+def reset_session():
+    """
+    Resets the session state without modifying persistent settings.
+    """
+    reset_session_state()
+    return "", session_history
 
-# Display Model Selection
-def display_model_selection():
+def apply_configuration(new_agent_name, new_agent_role, new_human_name):
+    """
+    Applies configuration changes by updating temporary variables.
+    """
+    global agent_name, agent_role, human_name
+    agent_name = new_agent_name
+    agent_role = new_agent_role
+    human_name = new_human_name
+    return "Configuration applied successfully!"
+
+def save_configuration(new_agent_name, new_agent_role, new_human_name):
+    """
+    Saves configuration changes to both temporary variables and persistent.yaml.
+    """
+    apply_configuration(new_agent_name, new_agent_role, new_human_name)
+    write_to_yaml('agent_name', agent_name)
+    write_to_yaml('agent_role', agent_role)
+    write_to_yaml('human_name', human_name)
+    return "Configuration saved successfully!"
+
+def chat_with_model(user_input):
+    """
+    Handles chat interaction with the AI model.
+    Combines user input and session history for prompt, updates session history.
+    """
+    global session_history, agent_output
+
     try:
-        fancy_delay(5)
-        os.system('clear')
-        print("=" * 90)
-        print("    MODEL CONFIGURATION")
-        print("=" * 90, "=-" * 44)    
-        print(" Model Setup Processes:")
-        print("-" * 90)    
-        print("\n Searching For Models...")
-        
-        available_models = [f for f in os.listdir("./models") if f.lower().endswith(('.bin', '.gguf'))]
-        
-        if not available_models:
-            print("No models found, exiting!")
-            return None
+        if not user_input.strip():
+            raise ValueError("Input cannot be empty.")
 
-        print("\nAvailable models:")
-        for i, model in enumerate(available_models):
-            print(f"{i+1}. {model}")
-        
-        selected = input("Select a model by entering its number: ")
-        if selected.isdigit() and 0 < int(selected) <= len(available_models):
-            selected_model = available_models[int(selected) - 1]
-        else:
-            print("Invalid selection.")
-            return None
+        # Simulate processing delay
+        processing_thread = threading.Thread(target=simulate_processing)
+        processing_thread.start()
 
-        model_path = os.path.join("./models", selected_model)
-        context_length = get_context_length(selected_model)
-        
-        if context_length:
-            print(f"Model {selected_model} has a context length of {context_length}.")
-        else:
-            print(f"Context length for {selected_model} not found in database.")
-            context_length = select_context_length()
-            if context_length:
-                update_model_database(selected_model, context_length)
-            else:
-                print("Invalid context length selection.")
-                return None
+        # Construct prompt
+        prompt = f"{session_history}\nUser: {user_input}\nAI:"
+        agent_output = f"Mock response to: {user_input}"  # Replace with actual AI logic
+        session_history += f"\nUser: {user_input}\nAI: {agent_output}"
 
-        utility.write_to_yaml('model_path', model_path)
-        utility.write_to_yaml('context_length', context_length)
-
-        return {'model_path': model_path, 'context_length': context_length}
+        return agent_output, session_history
     except Exception as e:
-        print(f"An error occurred during model selection: {e}")
-        return None
+        return f"Error: {e}", session_history
 
-def select_context_length():
-    print("\nAvailable context lengths:")
-    for i, length in enumerate(CONTEXT_LENGTH_MAP['chat'].values()):
-        print(f"{i+1}. {length}")
-    selected = input("Select a context length by entering its number: ")
-    if selected.isdigit() and 0 < int(selected) <= len(CONTEXT_LENGTH_MAP['chat']):
-        return list(CONTEXT_LENGTH_MAP['chat'].values())[int(selected) - 1]
-    return None
+def launch_gradio_interface():
+    """
+    Launches the Gradio interface with tabs for Conversation and Configuration.
+    """
+    with gr.Blocks() as interface:
+        with gr.Tabs():
+            # Tab 1: Conversation
+            with gr.Tab("Conversation"):
+                gr.Markdown("# Chat-Ubuntu-Gguf")
+                # Conversation Layout
+                with gr.Row():
+                    reset_btn = gr.Button("Reset Session")
+                    exit_btn = gr.Button("Exit Program")
 
-def get_context_length(model_name):
-    database_path = "./data/logs/model_database.txt"
-    try:
-        with open(database_path, 'r') as f:
-            for line in f:
-                if line.strip().startswith(model_name):
-                    return line.strip().split()[-1]
-    except FileNotFoundError:
-        print("Model database not found.")
-    return None
+                with gr.Row():
+                    with gr.Column():
+                        user_input = gr.Textbox(
+                            label="Your Input",
+                            lines=2,
+                            placeholder="Type your message here...",
+                            interactive=True,
+                        )
+                        bot_response = gr.Textbox(
+                            label="AI Response",
+                            lines=4,
+                            value=agent_output,
+                            interactive=False
+                        )
+                    session_history_display = gr.Textbox(
+                        label="Conversation History",
+                        lines=20,
+                        value=session_history,
+                        interactive=False
+                    )
 
-def update_model_database(model_name, context_length):
-    database_path = "./data/logs/model_database.txt"
-    with open(database_path, 'a') as f:
-        f.write(f"{model_name} {context_length}\n")
+                user_textbox = gr.Textbox(
+                    label="Enter Your Message",
+                    lines=2,
+                    interactive=True,
+                )
 
-# Roleplay Configuration Display
-def roleplay_configuration():
-    fancy_delay(5)
-    os.system('clear')
-    print("=" * 90)
-    print("    ROLEPLAY CONFIG")
-    print("=" * 90, "=-" * 44)
-    print("=-" * 45,"=-" * 44) 
-    print(" Roleplay Setup Processes:")
-    print("-" * 90)
-    default_values = utility.read_yaml()
-    print(f"\n Default Human Name = {default_values.get('human_name', 'Human')}")
-    print(f" Default Model Name, Role = {default_values.get('agent_name', 'Wise-Llama')}, {default_values.get('agent_role', 'Mystical Oracle')}")
-    print(f" Default Location = {default_values.get('scenario_location', 'on a mountain')}")
-    human_name = input("\n Your name is: ").strip() or default_values.get('human_name', 'Human')
-    agent_info_input = input(" Model's 'name, role' is: ")
-    agent_info = agent_info_input.split(", ") if agent_info_input else []
-    agent_name = agent_info[0].strip() if agent_info and len(agent_info) > 0 else default_values.get('agent_name', 'Wise-Llama')
-    agent_role = agent_info[1].strip() if len(agent_info) > 1 else default_values.get('agent_role', 'Mystical Oracle')
-    scenario_location = input(" The location is: ").strip() or default_values.get('scenario_location', 'on a mountain')
-    agent_emotion = default_values.get('agent_emotion')
-    session_history = default_values.get('session_history')
-    print("\n ...Details collected.\n")
-    time.sleep(2)
-    return human_name, agent_name, agent_role, agent_emotion, scenario_location, session_history
-    
-# Start Engine
-def display_engine():
-    fancy_delay(5)
-    os.system('clear')
-    print("=" * 90)
-    print("    MAIN LOOP")
-    print("=" * 90, "=-" * 44)
-    print(" Input/Output Processes:")
-    print("-" * 90, "")
-    return
+                # Button Actions for Conversation
+                reset_btn.click(
+                    fn=reset_session,
+                    inputs=[],
+                    outputs=[bot_response, session_history_display]
+                )
+                exit_btn.click(
+                    fn=lambda: ("Goodbye!", ""),
+                    inputs=[],
+                    outputs=[bot_response, session_history_display]
+                )
+                user_textbox.submit(
+                    fn=chat_with_model,
+                    inputs=user_textbox,
+                    outputs=[bot_response, session_history_display]
+                )
+
+            # Tab 2: Configuration
+            with gr.Tab("Configuration"):
+                gr.Markdown("# Configuration Settings")
+                # Configuration Layout
+                agent_name_input = gr.Textbox(label="Agent Name", value=agent_name)
+                agent_role_input = gr.Textbox(label="Agent Role", value=agent_role)
+                human_name_input = gr.Textbox(label="Human Name", value=human_name)
+
+                with gr.Row():
+                    apply_btn = gr.Button("Apply")
+                    save_btn = gr.Button("Save")
+
+                # Button Actions for Configuration
+                apply_btn.click(
+                    fn=apply_configuration,
+                    inputs=[agent_name_input, agent_role_input, human_name_input],
+                    outputs=None
+                )
+                save_btn.click(
+                    fn=save_configuration,
+                    inputs=[agent_name_input, agent_role_input, human_name_input],
+                    outputs=None
+                )
+
+    interface.launch()
+

@@ -6,20 +6,68 @@ from scripts import utility
 import os
 import time
 import re
-import subprocess
+import subproces
+from data.params.temporary import MODE_TO_TEMPERATURE, PROMPT_TO_MAXTOKENS
+from data.params.temporary import RAMFS_DIRs
 
 # Define the ramfs directory
 RAMFS_DIR = '/mnt/ramfs'
 
 # initialize the model
-def initialize_model(selected_model_path, optimal_threads):
+def initialize_model(models_dir='./models', optimal_threads=None):
+    """
+    Initializes a GGUF model using the configuration from model_config.json.
+    """
     global model
-    model = Llama(model_path=selected_model_path, n_threads=optimal_threads)
-    print(f"\n Model initialized with {optimal_threads} threads.")
+    try:
+        # Scan the models directory
+        models = utility.scan_models_directory(models_dir)
+        if not models:
+            raise FileNotFoundError("No valid GGUF model and model_config.json found in the models directory.")
+        
+        # Select the first valid model (adjust if multiple models need handling)
+        selected_model = models[0]
+        model_path = selected_model['model_path']
+        config_path = selected_model['config_path']
+
+        # Load configuration
+        with open(config_path, 'r') as config_file:
+            config = json.load(config_file)
+
+        # Extract and override relevant parameters
+        n_ctx = config["load_params"].get("n_ctx", 8192)
+        n_batch = config["load_params"].get("n_batch", 512)
+        use_mmap = config["load_params"].get("use_mmap", True)
+
+        print(f"Initializing model: {model_path} with context: {n_ctx}, batch: {n_batch}")
+        model = Llama(
+            model_path=model_path,
+            n_ctx=n_ctx,
+            n_batch=n_batch,
+            use_mmap=use_mmap,
+            use_mlock=False  # Override mlock to False
+        )
+        print("Model initialized successfully.")
+        utility.write_to_yaml('model_path', model_path)
+        utility.write_to_yaml('n_ctx', n_ctx)
+        utility.write_to_yaml('n_batch', n_batch)
+
+    except Exception as e:
+        print(f"Error during model initialization: {e}")
+        utility.write_to_yaml('error_log', f"Model initialization error: {e}")
+        model = None
+
 
 def run_llama_cli(prompt, max_tokens, temperature):
-    response = model(prompt, max_tokens=max_tokens, temperature=temperature)
-    return response['choices'][0]['text']
+    try:
+        if not model:
+            raise RuntimeError("Model is not initialized. Please load a valid model.")
+        response = model(prompt, max_tokens=max_tokens, temperature=temperature)
+        return response['choices'][0]['text']
+    except Exception as e:
+        print(f"Error during inference: {e}")
+        utility.write_to_yaml('error_log', f"Inference error: {e}")
+        return "Error: Could not generate a response."
 
 # Function to read and format prompts
 def read_and_format_prompt(file_name, data, task_name, syntax_type):
