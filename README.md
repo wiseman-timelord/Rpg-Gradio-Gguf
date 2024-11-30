@@ -15,7 +15,8 @@ The Reinvention of my WSL based ChatBot....
 - the terminal checking relevant folders for required files and performing any required maintenance, creating additional files as required, all before launching the gradio interface.
 
 ### Project Plans
-3) Explore integrating stable diffusion models for AI-generated maps and scenarios, there are some in gguf. If maps were able to be generated, and the user types in the name of the place to go, then little else need be done other than 
+1. Attempt to make the current scripts work flawlessly.
+2. work on modular features, ie, voice/image recognition and voice/image genearion. 
 
 ### FEATURES
 - Optimized code, 5 main scripts, creation of required folders.
@@ -35,33 +36,12 @@ The Reinvention of my WSL based ChatBot....
 4) "Tell me, Wise-Llama, what is the purpose of humanity?"
 
 ### Requirements
-- Ubuntu - Its programmed towards 24.04-24.10.
+- Ubuntu - Its programmed on/towards Ubuntu 24.04-24.10.
+- Python - It uses modern versions of Python in a VENV.
+- LLMs in GGUF format; testing on "Llama-3.1-Unhinged-Vision-8B-GGUF".
 
-### USAGE (Windows)
-1) Download and extract the package to a suitable folder, like "D:\Programs\Chat-VulkanLlama\", a path without spaces is always a better idea in general for GitHub projects.
-2) Install dependencies via `Installer.Bat`, if you get errors, then either you, installed 7-Zip to an unusual folder, or otherwise you need to, turn your firewall off temporarely or make a rule to allow (I dont advise the second, as its for cmd).
-3) Place a GGML model in `./models`, later on there will be selection from models library or something.. 
-4) Launch with `Launcher.Bat`, by default, sounds and text to speach are ON, edit arguments in `Launcher.bat`. Optionally resize window with Ctrl + scroll mouse.
-
-### USAGE (Linux):
-- Download and use "LlmCppPyBot_v1p07", and some earlier ones, they possibly have linux compatibility, but I was never able to test this. So probably don't.
-
-### CODE INFO:
-- Main scripts: `window_1.py`, `window_2.py`.
-- Utilities: `utility.py`, `model.py`, `interface.py`.
-
-### TEST PROMPTS:
-1) "Hello there! I never thought I would see you here on the mountain..."
-2) "Wow, you can actually talk? What's your story?"
-3) "You look wise, do you have any ancient wisdom to share?"
-4) "Tell me, Wise-Llama, what is the purpose of humanity?"
-
-### REQUIREMENTS:
-- Windows 8-11 - The official Python 3.9 wont run on earlier versions of windows, but the batches will. Though if need be, then earlier versions of python can be installed/used see below.
-- Python 3.9 non-Wsl (libraries `./data/requirements.txt`). Want to try other versions, then change "Python39" in the batch files to say "Python310", or whatever, in all cases. It will find it unless its in a wierd location.
-- Large Language Models in Llama 3 GGUF format, I advise "L3-8B-Stheno-v3.2-GGUF-IQ-Imatrix", 8B is probably Optimal, the better q3s and most q4s, will be able to handle the text processing prompts.
-
-
+### Usage
+- No working version verified yet.
 
 ## DISCLAIMER:
 - Refer to License.Txt for terms covering usage, distribution, and modifications.
