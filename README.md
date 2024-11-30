@@ -70,4 +70,5 @@ Selection; Menu Options = 1-2, Exit Program = X:
 - the file "Chat-Ubuntu-Gguf.sh" is a Installer-Launcher, its already done mostly.
 
 ## DISCLAIMER:
+- It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
 - Refer to License.Txt for terms covering usage, distribution, and modifications.
