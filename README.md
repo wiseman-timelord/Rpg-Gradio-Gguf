@@ -32,7 +32,7 @@ The current scripts from the end of session 2; project was brainstormed implemen
 - BASH - Bash Launcher-Installer for convinience. 
 
 ### Preview
-- The Instealler-Launcher is done pretty much...
+- The Installer-Launcher is done mostly, improvements possible...
 ```
 ================================================================================
     Chat-Ubuntu-Gguf
