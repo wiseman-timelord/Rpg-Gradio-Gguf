@@ -1,20 +1,19 @@
 # Chat-Ubuntu-Gguf
 - Converting windows python chatbot, to optimized use on Ubuntu. Still Getting the scripts done currently.
 
-### Planner:
+### Done:
 - it has had a name change to "Chat-UbuntuLlama", which is correct in the bash file.
 - Programmed towards Ubuntu 24 with Venv.
 - Programmed towards CPU, for simpler memory management. there will be no use of, opencl or vulkan, or gpu for now.
-- Programmed towards Gguf models only, maintained in "./models", eg, "./models/examplename.gguf". the program needs to scan this folder upon start, and there should be some kind of selection of models.
-- A text window and a graphical window. gradio interface for the chat interface. Engine window as terminal with library output shown and any necessary debug info.
-- additional scripts are generated as required, and placed in data folder, such as the json, but we want a maximum of 5 python scripts between "./" and "./scripts", for the program that is launched after the bash file has run the main program.
-- the terminal should be used to maximum advantage before loading the gradio interface, checking relevant folders for required files, creating additional files as required.
-
+- windows merged; by using gradio interface, removed window_2. and Window 1 became main_script. Window_2 will now be the gradio interface in the browser.
+- Programmed towards Gguf models only, maintained in "./models"; The model must now have a relating "./models/model_config.json" (useually supplied with the model). the program needs to scan this folder upon start, and utilize whatever model is there.
+- A text window and a graphical window. gradio interface for the chat interface. Engine window as terminal with library output shown and any necessary debug info; gradio interface is in runspace, and main scripts return to bash upon exit, and exiting the menu on the bash will shutdown all required things. the bash identifies the process upon launching the gradio interface; so long as people follow logical exit, then it will correctly close the gradio process in runspace). 
+- additional scripts are generated as required, and placed in data folder, such as the yaml for persistent settings.
+- we have 5 python scripts in total between "./" and "./scripts" and "./data", plush the bash script, and the rest, generates or downloads.
+- the terminal checking relevant folders for required files and performing any required maintenance, creating additional files as required, all before launching the gradio interface.
 
 ### Details:
-- Below is old content, that will be in some stage of update in project conversion from Chat-VulkanLlama...
-
-
+- The idea now is a much simpler interface, and then build upon it, but below is old content, that will be in some stage of update in project conversion from Chat-VulkanLlama...
 ```
 # CURRENT STATUS: Development... 
 - Test and fix scipts.
