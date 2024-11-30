@@ -23,7 +23,7 @@ The current scripts from the end of session 2; project was brainstormed implemen
 ### FEATURES
 - Optimized code, 5 main scripts, creation of required folders.
 - Running only with single GGUF model, featuring llama python.
-- Terminal and Gradio interface.
+- Terminal and Popout Browse based Gradio interface.
 - Memory Awareness and Optimized threading.
 - Continuous interactive user loop in Gradio Interface.
 - Intelligent, context-aware response generation with summary.
