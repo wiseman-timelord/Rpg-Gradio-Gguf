@@ -10,8 +10,16 @@ The Reinvention of my WSL based ChatBot....
 - the main_script checking relevant folders for required files and performing any required basic maintenance, all before popping up the gradio interface in browser.
 
 ### Project Plans
-1. Attempt to make the current scripts work flawlessly.
-2. work on modular features, ie, voice/image recognition and voice/image genearion. 
+1. Test and Bugfix, the current scripts from the end of session 2; project was brainstormed implementation, and restructured. Attempt to make the current scripts work...
+2. Test and Bugfix, all options and features, soes everything works.
+3. Optimize for Less Overall Characters, more advanced programming.
+2. Test and Bugfix, all options and features, soes everything works.
+4. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located.
+2. Test and Bugfix, all options and features, soes everything works.
+2. Release.
+5. work on modular features, ie, voice/image recognition and voice/image genearion. 
+
+###
 
 ### FEATURES
 - Optimized code, 5 main scripts, creation of required folders.
