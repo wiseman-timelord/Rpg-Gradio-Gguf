@@ -20,8 +20,6 @@ The current scripts from the end of session 2; project was brainstormed implemen
 2. Release.
 5. work on modular features, ie, voice/image recognition and voice/image genearion. 
 
-###
-
 ### FEATURES
 - Optimized code, 5 main scripts, creation of required folders.
 - Running only with single GGUF model, featuring llama python.
@@ -32,6 +30,27 @@ The current scripts from the end of session 2; project was brainstormed implemen
 - YAML state management for persistent settings, names and roles.
 - VENV - It uses a virtual environment in a "./venv" folder.
 - BASH - Bash Launcher-Installer for convinience. 
+
+### Preview
+- The Instealler-Launcher is done pretty much...
+```
+================================================================================
+    Chat-Ubuntu-Gguf
+================================================================================
+
+
+
+    1. Launch Main Program
+
+
+
+    2. Run Setup-Installer
+
+
+
+--------------------------------------------------------------------------------
+Selection; Menu Options = 1-2, Exit Program = X: 
+```
 
 ### Example Prompts
 1) "Hello there! I never thought I would see you here on the mountain..."
@@ -47,6 +66,8 @@ The current scripts from the end of session 2; project was brainstormed implemen
 
 ### Usage
 - No working version verified yet.
+- When it works, it will run through "sudo ./Chat-Ubuntu-Gguf.sh" in terminal in the program folder.
+- the file "Chat-Ubuntu-Gguf.sh" is a Installer-Launcher, its already done mostly.  
 
 ## DISCLAIMER:
 - Refer to License.Txt for terms covering usage, distribution, and modifications.
