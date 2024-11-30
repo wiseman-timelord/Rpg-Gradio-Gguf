@@ -36,7 +36,7 @@ The Reinvention of my WSL based ChatBot....
 - Ubuntu - Its programmed on/towards Ubuntu 24.04-24.10.
 - Python - It uses modern versions of Python in a VENV.
 - LLMs in GGUF format; testing on "Llama-3.1-Unhinged-Vision-8B-GGUF".
-- AMD - Programmed on AMD, not tested on other platforms.
+- AMD - Programmed on AMD, not currently tested on other platforms.
 
 ### Usage
 - No working version verified yet.
