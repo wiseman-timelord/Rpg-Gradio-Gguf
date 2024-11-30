@@ -40,15 +40,15 @@ The current scripts from the end of session 2; project was brainstormed implemen
 
 
 
+
     1. Launch Main Program
-
-
 
     2. Run Setup-Installer
 
 
 
---------------------------------------------------------------------------------
+
+ --------------------------------------------------------------------------------
 Selection; Menu Options = 1-2, Exit Program = X: 
 ```
 
