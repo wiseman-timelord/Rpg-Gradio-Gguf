@@ -3,13 +3,11 @@
 
 ### Project Details
 The Reinvention of my WSL based ChatBot....
-- Programmed towards CPU, for simpler memory management. there will be no use of, opencl or vulkan, or gpu for now.
-- windows merged; by using gradio interface, removed window_2. and Window 1 became main_script. Window_2 will now be the "./scripts/interface.py" including, text and gradio interface, gradio interface displaying in the popup browser window.
 - Programmed towards Gguf models only, maintained in "./models"; The model must now have a relating "./models/model_config.json" (useually supplied with the model). the program needs to scan this folder upon start, and utilize whatever model is there.
-- A text window and a graphical window. gradio interface for the chat interface. Engine window as terminal with library output shown and any necessary debug info; gradio interface is in runspace, and main scripts return to bash upon exit, and exiting the menu on the bash will shutdown all required things. the bash identifies the process upon launching the gradio interface; so long as people follow logical exit, then it will correctly close the gradio process in runspace). 
+- Gradio Interface is in runspace, and main scripts return to bash upon exit, and exiting the menu on the bash will shutdown all required things. the bash identifies the process upon launching the gradio interface; so long as people follow logical exit, then it will correctly close the gradio process in runspace). 
 - additional scripts are generated as required, and placed in data folder, such as the yaml for persistent settings.
-- we have 5 python scripts in total between "./" and "./scripts" and "./data", plush the bash script, and the rest, generates or downloads.
-- the terminal checking relevant folders for required files and performing any required maintenance, creating additional files as required, all before launching the gradio interface.
+- we have 5 python scripts in total between "./" and "./scripts" and "./data", plush the bash script, and the rest, generates, such as the yaml or required folders.
+- the main_script checking relevant folders for required files and performing any required basic maintenance, all before popping up the gradio interface in browser.
 
 ### Project Plans
 1. Attempt to make the current scripts work flawlessly.
