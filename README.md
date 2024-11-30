@@ -10,7 +10,8 @@ The Reinvention of my WSL based ChatBot....
 - the main_script checking relevant folders for required files and performing any required basic maintenance, all before popping up the gradio interface in browser.
 
 ### Project Plans
-1. Test and Bugfix, the current scripts from the end of session 2; project was brainstormed implementation, and restructured. Attempt to make the current scripts work...
+The current scripts from the end of session 2; project was brainstormed implementation, and restructured. 
+1. Test and Bugfix, Attempt to make Python scripts stable.
 2. Test and Bugfix, all options and features, soes everything works.
 3. Optimize for Less Overall Characters, more advanced programming.
 2. Test and Bugfix, all options and features, soes everything works.
