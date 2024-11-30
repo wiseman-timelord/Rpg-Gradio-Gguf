@@ -67,7 +67,7 @@ Selection; Menu Options = 1-2, Exit Program = X:
 ### Usage
 - No working version verified yet.
 - When it works, it will run through "sudo ./Chat-Ubuntu-Gguf.sh" in terminal in the program folder.
-- the file "Chat-Ubuntu-Gguf.sh" is a Installer-Launcher, its already done mostly.  
+- the file "Chat-Ubuntu-Gguf.sh" is a Installer-Launcher, its already done mostly.
 
 ## DISCLAIMER:
 - Refer to License.Txt for terms covering usage, distribution, and modifications.
