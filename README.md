@@ -21,23 +21,33 @@ The current scripts from the end of session 2; project was brainstormed implemen
 5. work on modular features, ie, voice/image recognition and voice/image genearion. 
 
 ### File Structure
+- Initial File Structure...
 ```
-./Chat-Ubuntu-Gguf.sh          # Main Bash launcher script
-./model_test.sh                # Test script for validating GGUF models
-./main_script.py               # Entry point script, updated for modularity
-./data/
-    temporary.py               # Centralized constants and mappings
-    persistent.yaml            # Persistent configuration and session state
-    requirements.txt           # Dependencies for the virtual environment
-./logs/                        # Directory for logging
-./models/                      # Directory for GGUF models and configs
-./prompts/
-    consolidate.txt            # Prompt template for consolidation tasks
-    converse.txt               # Prompt template for conversation tasks
-./scripts/
-    interface.py               # Gradio interface logic
-    model.py                   # GGUF model handling and interaction
-    utility.py   
+./
+├── Chat-Ubuntu-Gguf.sh        # Main Bash launcher script
+├── main_script.py             # Entry point script
+├── data/
+│   ├── requirements.txt       # Dependencies for the virtual environment
+├── logs/                      # (Empty directory, will contain log files during runtime)
+├── models/                    # Directory for GGUF models and configs
+├── prompts/
+│   ├── consolidate.txt        # Prompt template for consolidation tasks
+│   ├── converse.txt           # Prompt template for conversation tasks
+├── scripts/
+│   ├── interface.py           # Gradio interface logic
+│   ├── model.py               # GGUF model handling and interaction
+│   ├── utility.py             # Utility functions
+└── LICENSE.txt                # License file for the project
+```
+- Files Added by Installer...
+```
+./
+├── data/
+│   ├── temporary.py           # Created by the installer, holds global variables
+├── data/params/
+│   ├── __init__.py            # Created by the installer to mark the directory as a Python package
+/mnt/ramfs/
+├── persistent.yaml            # Created by the installer, holds default configuration
 ```
 
 ### FEATURES
