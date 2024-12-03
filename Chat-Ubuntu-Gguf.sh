@@ -3,7 +3,7 @@
 # Define paths and files
 PERSISTENT_FILE="./data/persistent.yaml"  # Updated location for persistent.yaml
 VENV_PATH="$(pwd)/venv"
-REQUIREMENTS_FILE="./data/requirements.txt"
+REQUIREMENTS_FILE="./requirements.txt"
 
 # Function to check if running as root
 check_sudo() {
