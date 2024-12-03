@@ -110,6 +110,28 @@ run_installer() {
     echo "Running the Setup-Installer..."
     sleep 1
 
+    # Ensure ./logs directory exists
+    if [ ! -d "./logs" ]; then
+        echo "Creating ./logs directory..."
+        mkdir ./logs
+        chmod 755 ./logs
+        echo "./logs directory created."
+    else
+        echo "./logs directory already exists."
+    fi
+    sleep 1
+
+    # Ensure ./models directory exists
+    if [ ! -d "./models" ]; then
+        echo "Creating ./models directory..."
+        mkdir ./models
+        chmod 755 ./models
+        echo "./models directory created."
+    else
+        echo "./models directory already exists."
+    fi
+    sleep 1
+
     # Create persistent.yaml
     create_persistent_yaml
     sleep 1
@@ -150,6 +172,8 @@ run_installer() {
     echo "Setup-Installer processes have been completed."
     sleep 2
 }
+
+
 
 # Launch function
 launch_program() {
@@ -218,7 +242,8 @@ while true; do
     echo "" 
     echo ""
     echo ""
-    echo ""  "--------------------------------------------------------------------------------"
+    echo ""
+    echo "--------------------------------------------------------------------------------"
     echo -n "Selection; Menu Options = 1-2, Exit Program = X: "
     read -r choice
     case "$choice" in
