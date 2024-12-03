@@ -20,7 +20,7 @@ The current scripts from the end of session 2; project was brainstormed implemen
 2. Release.
 5. work on modular features, ie, voice/image recognition and voice/image genearion. 
 
-### File Structure (Post-Session)
+### File Structure
 ```
 ./Chat-Ubuntu-Gguf.sh          # Main Bash launcher script
 ./model_test.sh                # Test script for validating GGUF models
