@@ -13,7 +13,7 @@ The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 nat
 The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native....
 - Done for next update: Errors fixed, removal of ramfs (will re-implement later), improvement/correction of bash functions, reduced scripts to 5 inc bash.
 - Working on Next...
-2. Continue with, Test and Bugfix, until stable
+1. Continue with, Test and Bugfix, until stable
 3. Optimize for Less Overall Characters, more advanced programming.
 2. Test and Bugfix, all options and features, soes everything works.
 4. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located.
@@ -28,9 +28,6 @@ The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 nat
 ├── Chat-Ubuntu-Gguf.sh        # Main Bash launcher script
 ├── main_script.py             # Entry point script
 ├── requirements.txt           # Dependencies for the virtual environment
-├── data/
-├── logs/                      # (Empty directory, will contain log files during runtime)
-├── models/                    # Directory for GGUF models and configs
 ├── prompts/
 │   ├── consolidate.txt        # Prompt template for consolidation tasks
 │   ├── converse.txt           # Prompt template for conversation tasks
@@ -40,13 +37,15 @@ The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 nat
 │   ├── utility.py             # Utility functions
 └── LICENSE.txt                # License file for the project
 ```
-- Files Added by Installer...
+- Files Added by Installer-Launcher/Program...
 ```
 ./
 ├── data/
 │   ├── temporary.py           # Created by the installer, holds global variables
 │   ├── __init__.py            # Created by the installer to mark the directory as a Python package
-│   ├── persistent.yaml            # Created by the installer, holds default configuration
+│   ├── persistent.yaml        # Created by the installer, holds default configuration
+├── logs/                      # (Empty directory, will contain log files during runtime)
+├── models/                    # Directory for, `*.GGUF` and `` ,models and configs
 ```
 
 ### FEATURES
