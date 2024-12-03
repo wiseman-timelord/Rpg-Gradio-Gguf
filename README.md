@@ -74,7 +74,7 @@ The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 nat
 
 
 
- --------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 Selection; Menu Options = 1-2, Exit Program = X: 
 ```
 
