@@ -1,11 +1,15 @@
 # Chat-Ubuntu-Gguf
 - Status: Alpha
 
-### Project Details
+### Development
 The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native....
 - Done for next update: Errors fixed, removal of ramfs (will re-implement later), improvement/correction of bash functions.
-- Working on Next:
-- Gradio Interface is in runspace, and main scripts return to bash upon exit, and exiting the menu on the bash will shutdown all required things. the bash identifies the process upon launching the gradio interface; so long as people follow logical exit, then it will correctly close the gradio process in runspace). 
+- Working on Next...
+1. Continue with, Test and Bugfix, until stable
+
+### Project details
+The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native....
+- Gradio Interface is in runspace in , and main scripts return to bash upon exit, and exiting the menu on the bash will shutdown all required things. the bash identifies the process upon launching the gradio interface; so long as people follow logical exit, then it will correctly close the gradio process in runspace). 
 - additional scripts are generated as required, and placed in data folder, such as the yaml for persistent settings.
 - we have 5 python scripts in total between "./" and "./scripts" and "./data", plus the bash script, and the rest, generates, such as the yaml or required folders.
 - the main_script checking relevant folders for required files and performing any required basic maintenance, all before popping up the gradio interface in browser.
