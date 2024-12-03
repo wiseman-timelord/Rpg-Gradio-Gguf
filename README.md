@@ -37,7 +37,7 @@ We are at ALPHA stage...
 │   ├── utility.py             # Utility functions
 └── LICENSE.txt                # License file for the project
 ```
-- Files Created by Install / Running...
+- Files Created by Installation...
 ```
 ./
 ├── data/
@@ -46,6 +46,7 @@ We are at ALPHA stage...
 │   ├── persistent.yaml        # Created by the installer, holds default configuration
 ├── logs/                      # (Empty directory, will contain log files during runtime)
 ├── models/                    # Directory for, `*.GGUF` and `` ,models and configs
+├── venv/                      # Venv local install of libraries avoiding system conflict.
 ```
 
 ### FEATURES
