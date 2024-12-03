@@ -3,7 +3,8 @@
 
 ### Project Details
 The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native....
-- Programmed towards Gguf models only, maintained in "./models"; The model must now have a relating "./models/model_config.json" (useually supplied with the model). the program needs to scan this folder upon start, and utilize whatever model is there.
+- Done for next update: Errors fixed, removal of ramfs (will re-implement later), improvement/correction of bash functions.
+- Working on Next:
 - Gradio Interface is in runspace, and main scripts return to bash upon exit, and exiting the menu on the bash will shutdown all required things. the bash identifies the process upon launching the gradio interface; so long as people follow logical exit, then it will correctly close the gradio process in runspace). 
 - additional scripts are generated as required, and placed in data folder, such as the yaml for persistent settings.
 - we have 5 python scripts in total between "./" and "./scripts" and "./data", plus the bash script, and the rest, generates, such as the yaml or required folders.
@@ -93,7 +94,11 @@ Selection; Menu Options = 1-2, Exit Program = X:
 ### Usage
 - No working version verified yet.
 - When it works, it will run through "sudo ./Chat-Ubuntu-Gguf.sh" in terminal in the program folder.
-- the file "Chat-Ubuntu-Gguf.sh" is a Installer-Launcher, its already done mostly.
+- the file "Chat-Ubuntu-Gguf.sh" is a Installer and Launcher, through menu; its already done mostly.
+- the python scripts search in `./models/` for the, `*.gguf` and `model_config.json`, files, and use that.
+- the user is presented with gradio interface popped up in default browser, and then have terminal somewhere.
+- the buttons do what you would expect, and the interface has all basic desired options available.
+
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
