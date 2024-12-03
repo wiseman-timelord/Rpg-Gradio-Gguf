@@ -12,7 +12,7 @@ The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 nat
 The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native....
 - Done for next update: Errors fixed, removal of ramfs (will re-implement later), improvement/correction of bash functions.
 - Working on Next...
-1. Move requirements to ./requirements.txt
+1. Move requirements to ./requirements.txt, thus being able to remove "./data".
 2. Continue with, Test and Bugfix, until stable
 3. Optimize for Less Overall Characters, more advanced programming.
 2. Test and Bugfix, all options and features, soes everything works.
