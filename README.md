@@ -20,6 +20,26 @@ The current scripts from the end of session 2; project was brainstormed implemen
 2. Release.
 5. work on modular features, ie, voice/image recognition and voice/image genearion. 
 
+### File Structure (Post-Session)
+```
+./Chat-Ubuntu-Gguf.sh          # Main Bash launcher script
+./model_test.sh                # Test script for validating GGUF models
+./main_script.py               # Entry point script, updated for modularity
+./data/
+    temporary.py               # Centralized constants and mappings
+    persistent.yaml            # Persistent configuration and session state
+    requirements.txt           # Dependencies for the virtual environment
+./logs/                        # Directory for logging
+./models/                      # Directory for GGUF models and configs
+./prompts/
+    consolidate.txt            # Prompt template for consolidation tasks
+    converse.txt               # Prompt template for conversation tasks
+./scripts/
+    interface.py               # Gradio interface logic
+    model.py                   # GGUF model handling and interaction
+    utility.py   
+```
+
 ### FEATURES
 - Optimized code, 5 main scripts, creation of required folders.
 - Running only with single GGUF model, featuring llama python.
