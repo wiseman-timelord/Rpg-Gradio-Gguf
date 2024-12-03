@@ -27,8 +27,8 @@ The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 nat
 ./
 ├── Chat-Ubuntu-Gguf.sh        # Main Bash launcher script
 ├── main_script.py             # Entry point script
+├── requirements.txt           # Dependencies for the virtual environment
 ├── data/
-│   ├── requirements.txt       # Dependencies for the virtual environment
 ├── logs/                      # (Empty directory, will contain log files during runtime)
 ├── models/                    # Directory for GGUF models and configs
 ├── prompts/
