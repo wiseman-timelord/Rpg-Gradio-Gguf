@@ -46,7 +46,8 @@ We are at ALPHA stage...
 │   ├── persistent.yaml        # Created by the installer, holds default configuration
 ├── logs/                      # (Empty directory, will contain log files during runtime)
 ├── models/                    # Directory for, `*.GGUF` and `` ,models and configs
-├── venv/                      # Venv local install of libraries avoiding system conflict.
+├── venv/                      # Venv local install folder avoiding system conflict.
+│   ├── *                      # Various libraries installed from `./requirements.txt`.
 ```
 
 ### FEATURES
