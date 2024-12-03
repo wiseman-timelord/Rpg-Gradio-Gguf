@@ -44,9 +44,7 @@ The current scripts from the end of session 2; project was brainstormed implemen
 ./
 ├── data/
 │   ├── temporary.py           # Created by the installer, holds global variables
-├── data/params/
 │   ├── __init__.py            # Created by the installer to mark the directory as a Python package
-/mnt/ramfs/
 ├── persistent.yaml            # Created by the installer, holds default configuration
 ```
 
