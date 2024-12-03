@@ -3,7 +3,7 @@
 
 ### Project details
 The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native....
-- Gradio Interface is in runspace in , and main scripts return to bash upon exit, and exiting the menu on the bash will shutdown all required things. the bash identifies the process upon launching the gradio interface; so long as people follow logical exit, then it will correctly close the gradio process in runspace). 
+- Gradio Interface is in runspace and the bash identifies the process upon launching the gradio interface, so proper bash exit will shutdown the runspace process. this will enable the terminal to display updates while gradio interface runs, but will require consideration in scripts. 
 - additional scripts are generated as required, and placed in data folder, such as the yaml for persistent settings.
 - we have 4 python scripts in total between "./" and "./scripts", plus the 1 bash installer-launcher script in `./`, while the rest self generate in `./data`; enabling editing by anyone with max 5 files for free in claude_sonnet.
 - a rotation of 2 prompts for, conversation and consolidation of events, producing basic context aware conversations. Will investigave putting both into 1 with the the newer models.
