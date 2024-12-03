@@ -2,7 +2,7 @@
 - Status: Alpha
 
 ### Project Details
-The Reinvention of my WSL based ChatBot....
+The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native....
 - Programmed towards Gguf models only, maintained in "./models"; The model must now have a relating "./models/model_config.json" (useually supplied with the model). the program needs to scan this folder upon start, and utilize whatever model is there.
 - Gradio Interface is in runspace, and main scripts return to bash upon exit, and exiting the menu on the bash will shutdown all required things. the bash identifies the process upon launching the gradio interface; so long as people follow logical exit, then it will correctly close the gradio process in runspace). 
 - additional scripts are generated as required, and placed in data folder, such as the yaml for persistent settings.
