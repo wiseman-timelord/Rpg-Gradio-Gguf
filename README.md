@@ -41,15 +41,13 @@ The current scripts from the end of session 2; project was brainstormed implemen
 ```
 
 ### FEATURES
-- Optimized code, 5 main scripts, creation of required folders.
-- Running only with single GGUF model, featuring llama python.
-- Terminal and Popout Browse based Gradio interface.
-- Memory Awareness and Optimized threading.
-- Continuous interactive user loop in Gradio Interface.
-- Intelligent, context-aware response generation with summary.
-- YAML state management for persistent settings, names and roles.
-- VENV - It uses a virtual environment in a "./venv" folder.
-- BASH - Bash Launcher-Installer for convinience. 
+- Model-Driven: Focused on GGUF-format models with accompanying configuration files.
+- Gradio Interface: A browser-based interactive interface tied seamlessly into terminal operations.
+- Integrated Setup and Operation: Through a single Bash launcher script that manages installation, execution, and cleanup.
+- Folder and File Management: Automated handling of configuration files, logs, and persistent data (YAML-based).
+- Modularity: Python scripts are designed to work together with clear roles (e.g., model handling, interface logic).
+- Persistence: Session data, settings, and configurations are retained across restarts.
+- Optimized for Ubuntu: Specifically tailored to Ubuntu 24.04–24.10 and AMD architecture.
 
 ### Preview
 - The Installer-Launcher is done mostly, improvements possible...
