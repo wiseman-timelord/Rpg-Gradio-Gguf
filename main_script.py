@@ -8,7 +8,7 @@ import argparse
 import threading
 import gradio as gr
 from scripts import interface, model as agent_module, utility
-from data.params.temporary import RAMFS_DIR, PERSISTENT_FILE, session_history, agent_name, agent_role, human_name
+from data.temporary import RAMFS_DIR, PERSISTENT_FILE, session_history, agent_name, agent_role, human_name
 from scripts.utility import read_yaml, write_to_yaml
 
 def load_and_initialize_model():

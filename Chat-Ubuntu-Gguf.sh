@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # Define paths and files
-TMPFS_DIR="/mnt/ramfs"
-PERSISTENT_FILE="$TMPFS_DIR/persistent.yaml"
+PERSISTENT_FILE="./data/persistent.yaml"  # Updated location for persistent.yaml
 VENV_PATH="$(pwd)/venv"
 REQUIREMENTS_FILE="./data/requirements.txt"
 
@@ -11,50 +10,117 @@ check_sudo() {
     if [[ $EUID -ne 0 ]]; then
         echo "Error: Sudo Authorization Required!"
         sleep 3
-        End_Of_Script
+        exit 1  # Directly exit
     else
         echo "Sudo authorization confirmed."
         sleep 1
     fi
 }
 
-# Functions to mount and unmount tmpfs
-mount_tmpfs() {
-    if ! mountpoint -q "$TMPFS_DIR"; then
-        sudo mkdir -p "$TMPFS_DIR"
-        sudo mount -t tmpfs -o size=100M tmpfs "$TMPFS_DIR"
-        sudo chmod 777 "$TMPFS_DIR"
-        echo "TMPFS mounted at $TMPFS_DIR"
+# Function to create __init__.py in ./data
+create_data_init_py() {
+    INIT_FILE="./data/__init__.py"
+    if [ ! -f "$INIT_FILE" ]; then
+        echo "Creating __init__.py in ./data"
+        touch "$INIT_FILE"
+        echo "# This file is auto-generated to mark this directory as a Python package." > "$INIT_FILE"
+        chmod 644 "$INIT_FILE"
+        echo "__init__.py created successfully in ./data."
     else
-        echo "TMPFS is already mounted at $TMPFS_DIR"
+        echo "__init__.py already exists in ./data."
     fi
+}
 
+# Function to create persistent.yaml
+create_persistent_yaml() {
     if [[ ! -f "$PERSISTENT_FILE" ]]; then
-        echo "Creating persistent.yaml in $TMPFS_DIR"
+        echo "Creating persistent.yaml in ./data"
         cat > "$PERSISTENT_FILE" <<EOL
 # DEFAULT_CONFIG:
 human_name: "Human"
 agent_name: "Wise-Llama"
 agent_role: "Wise Oracle"
 EOL
-        sudo chmod 666 "$PERSISTENT_FILE"
-        echo "Persistent.yaml created with default configuration."
+        chmod 666 "$PERSISTENT_FILE"
+        echo "persistent.yaml created with default configuration."
+    else
+        echo "persistent.yaml already exists in ./data."
     fi
 }
 
-unmount_tmpfs() {
-    if mountpoint -q "$TMPFS_DIR"; then
-        sudo umount "$TMPFS_DIR"
-        sudo rmdir "$TMPFS_DIR"
-        echo "TMPFS unmounted from $TMPFS_DIR"
+# Function to create temporary.py in ./data
+create_temporary_py() {
+    TEMPORARY_FILE="./data/temporary.py"
+    if [ ! -f "$TEMPORARY_FILE" ]; then
+        echo "Creating temporary.py in ./data"
+        cat > "$TEMPORARY_FILE" <<EOL
+# Temporary variables for Chat-Ubuntu-Gguf
+
+# General Variables
+session_history = "the conversation started"  # Default: "the conversation started"
+rotation_counter = 0
+
+# Model Variables
+loaded_models = {}
+llm = None
+
+# Configurable Keys
+agent_name = "Empty"
+agent_role = "Empty"
+human_name = "Empty"
+
+# Other Keys
+agent_output = ""
+human_input = ""
+
+# Model Mapping
+MODE_TO_TEMPERATURE = {
+    'RolePlaying': 0.7,
+    'TextProcessing': 0.1
+}
+
+PROMPT_TO_MAXTOKENS = {
+    'converse': 2000,
+    'consolidate': 1000
+}
+
+# Syntax Options
+SYNTAX_OPTIONS_DISPLAY = [
+    "{combined_input}",
+    "User: {combined_input}",
+    "User:\\n{combined_input}",
+    "### Human: {combined_input}",
+    "### Human:\\n{combined_input}",
+    "### Instruction: {combined_input}",
+    "### Instruction:\\n{combined_input}",
+    "{system_input}. USER: {instruct_input}",
+    "{system_input}\\nUser: {instruct_input}"
+]
+SYNTAX_OPTIONS = SYNTAX_OPTIONS_DISPLAY
+EOL
+        chmod 644 "$TEMPORARY_FILE"
+        echo "temporary.py created successfully."
     else
-        echo "TMPFS is not mounted at $TMPFS_DIR"
+        echo "temporary.py already exists in ./data."
     fi
 }
 
 # Installer function
 run_installer() {
     echo "Running the Setup-Installer..."
+    sleep 1
+
+    # Create persistent.yaml
+    create_persistent_yaml
+    sleep 1
+
+    # Create temporary.py in ./data
+    create_temporary_py
+    sleep 1
+
+    # Create __init__.py in ./data
+    create_data_init_py
+    sleep 1
 
     # Virtual environment check and creation
     if [ ! -d "$VENV_PATH" ]; then
@@ -82,13 +148,12 @@ run_installer() {
     sleep 1
 
     echo "Setup-Installer processes have been completed."
-    sleep 3
+    sleep 2
 }
 
 # Launch function
 launch_program() {
     echo "Preparing to launch the main program..."
-    mount_tmpfs
 
     echo "Verifying virtual environment..."
     if [ ! -d "$VENV_PATH" ]; then
@@ -125,13 +190,6 @@ End_Of_Script() {
     if [[ "$VIRTUAL_ENV" != "" ]]; then
         echo "Deactivating virtual environment..."
         deactivate
-    fi
-    
-    # Unmount tmpfs if mounted
-    echo "Checking for mounted TMPFS..."
-    if mountpoint -q "$TMPFS_DIR"; then
-        echo "Unmounting TMPFS..."
-        unmount_tmpfs
     fi
 
     # Notify user and exit gracefully
