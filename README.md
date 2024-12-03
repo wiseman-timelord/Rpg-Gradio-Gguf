@@ -81,7 +81,7 @@ Selection; Menu Options = 1-2, Exit Program = X:
 ### Requirements
 - Ubuntu - Its programmed on/towards Ubuntu 24.04-24.10.
 - Python - It uses modern versions of Python in a VENV.
-- LLMs in GGUF format; testing on "Llama-3.1-Unhinged-Vision-8B-GGUF".
+- LLMs - GGUF format with an accompanying "model_config.json" file in same dir.
 - AMD - Programmed on AMD, not currently testing on other platforms.
 
 ### Usage
