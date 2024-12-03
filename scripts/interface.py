@@ -1,7 +1,7 @@
 # .\scripts\interface.py
 
 from scripts.utility import reset_session_state, write_to_yaml
-from data.params.temporary import session_history, agent_output, agent_name, agent_role, human_name
+from data.temporary import session_history, agent_output, agent_name, agent_role, human_name
 import gradio as gr
 import threading
 import time

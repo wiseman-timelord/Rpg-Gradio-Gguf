@@ -4,13 +4,13 @@
 import yaml
 import os
 import time
-from data.params.temporary import RAMFS_DIR, session_history, agent_output, human_input
+from data.temporary import session_history, agent_output, human_input
 
 # Define the RAMFS directory
 RAMFS_DIR = '/mnt/ramfs'
 
 # Function to read YAML file
-def read_yaml(file_path=os.path.join(RAMFS_DIR, 'persistent.yaml')):
+def read_yaml(file_path='./data/persistent.yaml'):
     """
     Reads the YAML file and returns its contents as a dictionary.
     """
@@ -23,7 +23,7 @@ def read_yaml(file_path=os.path.join(RAMFS_DIR, 'persistent.yaml')):
         print(f"Error reading YAML: {e}")
         return {}
 
-def write_to_yaml(key, value, file_path=os.path.join(RAMFS_DIR, 'persistent.yaml')):
+def write_to_yaml(key, value, file_path='./data/persistent.yaml'):
     """
     Writes a key-value pair to the YAML file.
     """

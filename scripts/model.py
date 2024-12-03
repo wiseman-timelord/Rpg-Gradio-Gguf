@@ -6,9 +6,9 @@ from scripts import utility
 import os
 import time
 import re
-import subproces
-from data.params.temporary import MODE_TO_TEMPERATURE, PROMPT_TO_MAXTOKENS
-from data.params.temporary import RAMFS_DIRs
+import subprocess  # Corrected typo
+from data.temporary import MODE_TO_TEMPERATURE, PROMPT_TO_MAXTOKENS
+
 
 # Define the ramfs directory
 RAMFS_DIR = '/mnt/ramfs'
