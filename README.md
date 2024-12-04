@@ -83,7 +83,7 @@ Selection; Menu Options = 1-2, Exit Program = X:
 - Ubuntu - Its programmed on/towards Ubuntu 24.04-24.10.
 - Python - It uses modern versions of Python in a VENV.
 - LLMs - GGUF format with a provided, "model_config.json" or "config.json", file in same dir.
-- AMD - Programmed on AMD, not currently testing on other platforms.
+- AMD - Created and Tested on AMD CPU, not testing on other hardware.
 
 ### Usage
 1. When it works, it will run through "sudo ./Chat-Ubuntu-Gguf.sh" in terminal in the program folder.
