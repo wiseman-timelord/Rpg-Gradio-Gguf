@@ -50,7 +50,7 @@ The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 nat
 Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. There are 4 python scripts in, "./" and "./scripts", and 1 bash script in `./`, enabling editing with the maximum of 5 files upload in claude_sonnet for free account, thus, able to be modified into their own custom chatbot by anyone. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. Still being created, tba.  
 
 ### FEATURES
-- Gguf Models: Using, Gguf-Parser and accompanying json files, auto-configuring model parameters. 
+- Gguf Models: Using, Gguf-Parser and accompanying json files; auto-configuration of model parameters. 
 - Gradio Interface: A browser-based interactive interface tied seamlessly into terminal operations.
 - Integrated Setup and Operation: Through a single Bash launcher script that manages installation, execution, and cleanup.
 - Folder and File Management: Automated handling of configuration files, logs, and persistent data (YAML-based).
