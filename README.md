@@ -42,12 +42,12 @@ We are at ALPHA stage...
 │   ├── temporary.py           # Created by the installer, holds global variables
 │   ├── __init__.py            # Created by the installer to mark the directory as a Python package
 │   ├── persistent.yaml        # Created by the installer, holds default configuration
-├── logs/                      # (Empty directory, will contain log files during runtime)
-├── models/                    # Directory for, `*.GGUF` and `` ,models and configs
 ├── scripts/
 │   ├── terminate_gradio.py    # Terminate gradio in the runspace.
 ├── venv/                      # Venv local install folder avoiding system conflict.
 │   ├── *                      # Various libraries installed from `./requirements.txt`.
+├── logs/                      # (Empty) Will contain any produced log files.
+├── models/                    # (Empty) Directory for, `*.GGUF` and `model_config.json` ,files
 ```
 
 ### FEATURES
