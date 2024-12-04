@@ -82,7 +82,7 @@ Selection; Menu Options = 1-2, Exit Program = X:
 ### Requirements
 - Ubuntu - Its programmed on/towards Ubuntu 24.04-24.10.
 - Python - It uses modern versions of Python in a VENV.
-- LLMs - GGUF format with a provided, "model_config.json" or "config.json", file in same dir.
+- LLMs - GGUF format Large Language Models, it will detect parameters.
 - AMD - Created and Tested on AMD CPU, not testing on other hardware.
 
 ### Usage
