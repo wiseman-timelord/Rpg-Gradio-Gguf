@@ -13,6 +13,24 @@ from data.temporary import MODE_TO_TEMPERATURE, PROMPT_TO_MAXTOKENS
 # Define the ramfs directory
 RAMFS_DIR = '/mnt/ramfs'
 
+def process_selected_model(models_dir='./models'):
+    """
+    Scans the models directory, selects a model, and initializes it.
+    """
+    print(f"Scanning {models_dir} for models...")
+    models = utility.scan_models_directory(models_dir)
+    if not models:
+        raise FileNotFoundError("No valid GGUF models found in the directory.")
+    
+    # Select the first available model (or add logic for user selection if needed)
+    selected_model = models[0]
+    print(f"Selected model: {selected_model['model_path']}")
+    
+    # Initialize the model
+    initialize_model(models_dir=models_dir, optimal_threads=utility.calculate_optimal_threads())
+    print("Model selection and initialization completed.")
+
+
 # initialize the model
 def initialize_model(models_dir='./models', optimal_threads=None):
     """

@@ -16,6 +16,7 @@ def load_and_initialize_model():
     Loads and initializes the model as part of the main program flow.
     """
     print("Scanning models directory and initializing model...")
+    from scripts.model import process_selected_model  # Ensure import of new function
     process_selected_model(models_dir='./models')
 
 def load_persistent_settings():
