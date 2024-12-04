@@ -34,7 +34,7 @@ def process_selected_model(models_dir='./models'):
 
 
 # initialize the model
-def initialize_model(models_dir='./models'):
+def initialize_model(models_dir='./models', optimal_threads=None):
     """
     Initializes a GGUF model, extracting metadata using gguf-parser.
     Optionally uses configuration files for additional overrides.
@@ -51,7 +51,9 @@ def initialize_model(models_dir='./models'):
         # Parse metadata from GGUF file
         parser = GGUFParser(model_path)
         parser.parse()
-        metadata = parser.get_metadata()
+        
+        # Access metadata directly
+        metadata = parser.metadata
 
         # Display GGUF metadata
         print("Metadata extracted from GGUF file:")
@@ -68,17 +70,40 @@ def initialize_model(models_dir='./models'):
             # Merge config data into metadata
             metadata.update(config_data)
 
-        # Initialize model (use metadata as needed for your library)
-        print("Initializing model with the following parameters:")
-        print(metadata)
+        # Include optimal_threads in metadata if provided
+        if optimal_threads is not None:
+            metadata['optimal_threads'] = optimal_threads
+            print(f"Using optimal threads: {optimal_threads}")
 
-        # Example: Use metadata to initialize a model object
+        # Validate required parameters
+        required_parameters = [
+            'llama.context_length', 'llama.embedding_length', 'llama.feed_forward_length',
+            'llama.attention.head_count', 'llama.attention.head_count_kv', 'llama.vocab_size',
+            'general.architecture', 'general.name'
+        ]
+
+        missing_parameters = [param for param in required_parameters if param not in metadata]
+        if missing_parameters:
+            print("Warning: Missing required parameters:")
+            for param in missing_parameters:
+                print(f" - {param}")
+
+        # Confirm all parameters for initialization
+        print("\nFinal Parameters for Model Initialization:")
+        for key, value in metadata.items():
+            print(f"{key}: {value}")
+
+        if missing_parameters:
+            print("Missing parameters, using defaults.")
+        else:
+            print("All required parameters are present.")
+
+        # Initialize model (use metadata as needed for your library)
         # model = YourModelLibrary(model_path=model_path, **metadata)
 
         print("Model initialized successfully.")
     except Exception as e:
         print(f"Error during model initialization: {e}")
-
 
 def run_llama_cli(prompt, max_tokens, temperature):
     try:
