@@ -11,7 +11,6 @@ The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 nat
 2. Release.
 5. work on expansion of features, this will require a list of wanted features, then break down to, least code and best advantage, to round off features.
 6. release final version.
-8. update for new models as required.
 
 ### File Structure
 - Initial File Structure...
