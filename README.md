@@ -57,7 +57,7 @@ Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate
 ### Preview
 - Alpha Gradio Interface - Looking the part...
 
-![preview_image](media/gradio_main.png)
+![preview_image](media/configuration.png)
 
 - The Bash Installer/Launcher - under development...
 ```
