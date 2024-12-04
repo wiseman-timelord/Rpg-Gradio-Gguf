@@ -37,9 +37,9 @@ The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 nat
 ```
 ./
 ├── data/
-│   ├── temporary.py           # Created by the installer, holds global variables
-│   ├── __init__.py            # Created by the installer to mark the directory as a Python package
-│   ├── persistent.yaml        # Created by the installer, holds default configuration
+│   ├── temporary.py           # Holds ALL global variables
+│   ├── __init__.py            # to mark the directory as a Python package
+│   ├── persistent.yaml        # Holds default Chatbot configuration
 ├── scripts/
 │   ├── terminate_gradio.py    # Terminate gradio in the runspace.
 ├── venv/                      # Venv local install folder avoiding system conflict.
