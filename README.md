@@ -3,13 +3,10 @@
 
 ### Project Plans
 The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native...
-1. Ensure Gradio interface has correct layout and configuration.
-2. a Gradio Interface with model is loaded, so upon proper exit, ensure the, shutdown and unload, is comprihensive in the end_of_script function..
-3. Continue with, Test and Bugfix, for all features/options, until stable.
+1. Gradio Interface Configuration - Threads through slider, buttons `Save Settings` `Revert Settings`. 
+3. Continue with, Test and Bugfix, for all features/options, pre interference.
 4. Test, conversation and prompting, and examine responses, then improve.
-3. Upon correct and working version, then Optimize for Less Overall Characters, more advanced programming.
-2. Test and Bugfix, all options and features, soes everything still works.
-4. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script.
+3. Upon correct and working version, then Optimize for Less Overall Characters, more advanced programming. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script.
 2. Test and Bugfix, all options and features, soes everything still works.
 2. Release.
 5. work on expansion of features, this will require a list of wanted features, then break down to, least code and best advantage, to round off features.
