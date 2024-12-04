@@ -44,6 +44,8 @@ We are at ALPHA stage...
 │   ├── persistent.yaml        # Created by the installer, holds default configuration
 ├── logs/                      # (Empty directory, will contain log files during runtime)
 ├── models/                    # Directory for, `*.GGUF` and `` ,models and configs
+├── scripts/
+│   ├── terminate_gradio.py    # Terminate gradio in the runspace.
 ├── venv/                      # Venv local install folder avoiding system conflict.
 │   ├── *                      # Various libraries installed from `./requirements.txt`.
 ```
