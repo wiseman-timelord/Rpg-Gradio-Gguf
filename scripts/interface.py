@@ -23,9 +23,13 @@ def shutdown():
 
 def reset_session():
     """
-    Resets the session state without modifying persistent settings.
+    Resets the session state and clears relevant UI components.
     """
-    reset_session_state()
+    global agent_output, session_history, human_input
+    reset_session_state()  # Reset globals
+    agent_output = ""
+    session_history = "The conversation started."
+    human_input = ""
     return "", session_history
 
 def apply_configuration(new_agent_name, new_agent_role, new_human_name):
@@ -136,9 +140,8 @@ def launch_gradio_interface():
                 reset_btn.click(
                     fn=reset_session,
                     inputs=[],
-                    outputs=[bot_response, session_history_display]
+                    outputs=[bot_response, session_history_display]  # Two outputs
                 )
-                # Exit Button: Closes Browser Tab and Shuts Down Python Script
                 gr.HTML(
                     value="<script>function closeTab() { window.open('','_self').close(); }</script>"
                 )
