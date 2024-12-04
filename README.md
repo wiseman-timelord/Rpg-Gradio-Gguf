@@ -57,7 +57,7 @@ Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate
 ### Preview
 - Alpha Conversation Page...
 
-![preview_image](media/configuration.png)
+![preview_image](media/main_page.png)
 
 - Alpha Configuration Page...
 
