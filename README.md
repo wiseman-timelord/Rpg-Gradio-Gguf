@@ -3,9 +3,8 @@
 
 ### Project Plans
 The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native...
-1. Ensure the gradio interface is correctly popping up in default browser. 
-2. Ensure Gradio interface has correct layout and configuration.
-3. a Gradio Interface with model is loaded, so upon proper exit, ensure the, shutdown and unload, is comprihensive in the end_of_script function..
+1. Ensure Gradio interface has correct layout and configuration.
+2. a Gradio Interface with model is loaded, so upon proper exit, ensure the, shutdown and unload, is comprihensive in the end_of_script function..
 3. Continue with, Test and Bugfix, for all features/options, until stable.
 4. Test, conversation and prompting, and examine responses, then improve.
 3. Upon correct and working version, then Optimize for Less Overall Characters, more advanced programming.
