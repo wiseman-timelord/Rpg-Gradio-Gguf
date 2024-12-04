@@ -81,39 +81,42 @@ def launch_gradio_interface():
             # Tab 1: Conversation
             with gr.Tab("Conversation"):
                 gr.Markdown("# Chat-Ubuntu-Gguf")
+
                 # Conversation Layout
                 with gr.Row():
-                    reset_btn = gr.Button("Reset Session")
-                    exit_btn = gr.Button("Exit Program")
-
-                with gr.Row():
-                    with gr.Column():
+                    with gr.Column(scale=3):
+                        bot_response = gr.Textbox(
+                            label="AI Response",
+                            lines=10,
+                            value=agent_output,
+                            interactive=False
+                        )
                         user_input = gr.Textbox(
                             label="Your Input",
                             lines=2,
                             placeholder="Type your message here...",
-                            interactive=True,
+                            interactive=True
                         )
-                        bot_response = gr.Textbox(
-                            label="AI Response",
-                            lines=4,
-                            value=agent_output,
+                    with gr.Column(scale=1):
+                        session_history_display = gr.Textbox(
+                            label="Conversation History",
+                            lines=15,
+                            value=session_history,
                             interactive=False
                         )
-                    session_history_display = gr.Textbox(
-                        label="Conversation History",
-                        lines=20,
-                        value=session_history,
-                        interactive=False
-                    )
 
-                user_textbox = gr.Textbox(
-                    label="Enter Your Message",
-                    lines=2,
-                    interactive=True,
+                # Button Row at the bottom
+                with gr.Row():
+                    send_btn = gr.Button("Send Message")
+                    reset_btn = gr.Button("Reset Session")
+                    exit_btn = gr.Button("Exit Program")
+
+                # Button Actions
+                send_btn.click(
+                    fn=chat_with_model,
+                    inputs=user_input,
+                    outputs=[bot_response, session_history_display]
                 )
-
-                # Button Actions for Conversation
                 reset_btn.click(
                     fn=reset_session,
                     inputs=[],
@@ -122,11 +125,6 @@ def launch_gradio_interface():
                 exit_btn.click(
                     fn=lambda: ("Goodbye!", ""),
                     inputs=[],
-                    outputs=[bot_response, session_history_display]
-                )
-                user_textbox.submit(
-                    fn=chat_with_model,
-                    inputs=user_textbox,
                     outputs=[bot_response, session_history_display]
                 )
 
@@ -155,4 +153,5 @@ def launch_gradio_interface():
                 )
 
     interface.launch()
+
 

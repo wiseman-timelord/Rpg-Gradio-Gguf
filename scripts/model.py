@@ -9,8 +9,7 @@ import time
 import re
 import json
 import subprocess  # Corrected typo
-from data.temporary import MODE_TO_TEMPERATURE, PROMPT_TO_MAXTOKENS
-
+from data.temporary import MODE_TO_TEMPERATURE, PROMPT_TO_MAXTOKENS, PROMPT_TO_SETTINGS
 
 # Define the ramfs directory
 RAMFS_DIR = '/mnt/ramfs'
@@ -189,57 +188,37 @@ def parse_agent_response(raw_agent_response, data):
     cleaned_response = re.sub(rf'^### {agent_name}\n', '', cleaned_response, flags=re.MULTILINE)
     return cleaned_response
 
-def prompt_response(task_name, rotation_counter, enable_logging=False, save_to=None, loaded_models=None):
+def prompt_response(task_name, rotation_counter, enable_logging=False, save_to=None):
+    """
+    Generates a response based on the task name and updates session variables.
+    """
     data = utility.read_yaml()
     if data is None:
         return {"error": "Could not read config file."}
 
-    mode = 'RolePlaying' if task_name == 'converse' else 'TextProcessing'
-    temperature = MODE_TO_TEMPERATURE[mode]
-    
+    # Retrieve prompt-specific settings
+    prompt_settings = PROMPT_TO_SETTINGS.get(task_name, {})
+    temperature = prompt_settings.get('temperature', 0.7)
+    repeat_penalty = prompt_settings.get('repeat_penalty', 1.1)
+    max_tokens = prompt_settings.get('max_tokens', 2000)
+
     prompt_file = f"./data/prompts/{task_name}.txt"
-    formatted_prompt = read_and_format_prompt(prompt_file, data, task_name, None)  # Removed syntax_type argument
+    formatted_prompt = read_and_format_prompt(prompt_file, data, task_name, None)
     if not os.path.exists(prompt_file) or formatted_prompt is None:
         return {"error": f"Prompt file {prompt_file} not found or failed to format."}
-
-    max_tokens = PROMPT_TO_MAXTOKENS.get(task_name, 2000)
 
     raw_agent_response = run_llama_cli(formatted_prompt, max_tokens, temperature)
 
     if enable_logging:
-        log_entry_name = f"{task_name}_response"
-        log_message(formatted_prompt, 'input', log_entry_name, f"event {rotation_counter}", enable_logging)
-        log_message(raw_agent_response, 'output', log_entry_name, f"event {rotation_counter}", enable_logging)
+        log_message(formatted_prompt, 'input', task_name, f"event {rotation_counter}", enable_logging)
+        log_message(raw_agent_response, 'output', task_name, f"event {rotation_counter}", enable_logging)
 
     parsed_response = parse_agent_response(raw_agent_response, data)
     if save_to:
         utility.write_to_yaml(save_to, parsed_response)
 
-    new_session_history = None
-    new_emotion = None
     if task_name == 'consolidate':
-        new_session_history = parsed_response
-        utility.write_to_yaml('session_history', new_session_history)
-    elif task_name == 'emotions':
-        emotion_keywords = ["Love", "Arousal", "Euphoria", "Surprise", "Curiosity", "Indifference", "Fatigue", "Discomfort", "Embarrassment", "Anxiety", "Stress", "Anger", "Hate"]
-        found_emotions = [word for word in emotion_keywords if re.search(rf"\b{word}\b", parsed_response, re.IGNORECASE)]
-        new_emotion = ", ".join(found_emotions)
-        utility.write_to_yaml('agent_emotion', new_emotion)
+        utility.write_to_yaml('session_history', parsed_response)
 
-    return {
-        'agent_response': parsed_response,
-        'new_session_history': new_session_history,
-        'new_emotion': new_emotion
-    }
+    return {'agent_response': parsed_response}
 
-# Define MODE_TO_TEMPERATURE and PROMPT_TO_MAXTOKENS dictionaries
-MODE_TO_TEMPERATURE = {
-    'RolePlaying': 0.7,
-    'TextProcessing': 0.1
-}
-
-PROMPT_TO_MAXTOKENS = {
-    'converse': 2000,
-    'emotions': 500,
-    'consolidate': 1000
-}

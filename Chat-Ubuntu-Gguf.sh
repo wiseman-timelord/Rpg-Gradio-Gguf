@@ -17,44 +17,56 @@ check_sudo() {
     fi
 }
 
-# Function to create __init__.py in ./data
-create_data_init_py() {
-    INIT_FILE="./data/__init__.py"
-    if [ ! -f "$INIT_FILE" ]; then
-        echo "Creating __init__.py in ./data"
-        touch "$INIT_FILE"
-        echo "# This file is auto-generated to mark this directory as a Python package." > "$INIT_FILE"
-        chmod 644 "$INIT_FILE"
-        echo "__init__.py created successfully in ./data."
+# Ensure the ./data directory exists
+ensure_data_directory() {
+    if [ ! -d "./data" ]; then
+        echo "Creating ./data directory..."
+        mkdir ./data
+        chmod 755 ./data
+        echo "./data directory created successfully."
     else
-        echo "__init__.py already exists in ./data."
+        echo "./data directory already exists."
     fi
 }
 
+# Function to create __init__.py in ./data
+create_data_init_py() {
+    ensure_data_directory  # Ensure the directory exists
+    local INIT_FILE="./data/__init__.py"
+    echo "Creating or overwriting __init__.py in ./data"
+    cat > "$INIT_FILE" <<EOL
+# This file is auto-generated to mark this directory as a Python package.
+EOL
+    chmod 644 "$INIT_FILE"
+    echo "__init__.py created or overwritten successfully in ./data."
+}
+
+
 # Function to create persistent.yaml
 create_persistent_yaml() {
-    if [[ ! -f "$PERSISTENT_FILE" ]]; then
-        echo "Creating persistent.yaml in ./data"
-        cat > "$PERSISTENT_FILE" <<EOL
+    ensure_data_directory  # Ensure the directory exists
+    local PERSISTENT_FILE="./data/persistent.yaml"
+    echo "Creating or overwriting persistent.yaml in ./data"
+    cat > "$PERSISTENT_FILE" <<EOL
 # DEFAULT_CONFIG:
 human_name: "Human"
 agent_name: "Wise-Llama"
 agent_role: "Wise Oracle"
 EOL
-        chmod 666 "$PERSISTENT_FILE"
-        echo "persistent.yaml created with default configuration."
-    else
-        echo "persistent.yaml already exists in ./data."
-    fi
+    chmod 666 "$PERSISTENT_FILE"
+    echo "persistent.yaml created or overwritten successfully with default configuration."
 }
 
 # Function to create temporary.py in ./data
 create_temporary_py() {
-    TEMPORARY_FILE="./data/temporary.py"
-    if [ ! -f "$TEMPORARY_FILE" ]; then
-        echo "Creating temporary.py in ./data"
-        cat > "$TEMPORARY_FILE" <<EOL
+    ensure_data_directory  # Ensure the directory exists
+    local TEMPORARY_FILE="./data/temporary.py"
+    echo "Creating or overwriting temporary.py in ./data"
+    cat > "$TEMPORARY_FILE" <<EOL
 # Temporary variables for Chat-Ubuntu-Gguf
+
+# Paths
+PERSISTENT_FILE = "./data/persistent.yaml"
 
 # General Variables
 session_history = "the conversation started"  # Default: "the conversation started"
@@ -73,7 +85,14 @@ human_name = "Empty"
 agent_output = ""
 human_input = ""
 
-# Model Mapping
+# Syntax Options
+SYNTAX_OPTIONS = [
+    "{combined_input}",
+    "User: {combined_input}",
+    "User:\\n{combined_input}"
+]
+
+# Settings
 MODE_TO_TEMPERATURE = {
     'RolePlaying': 0.7,
     'TextProcessing': 0.1
@@ -84,26 +103,15 @@ PROMPT_TO_MAXTOKENS = {
     'consolidate': 1000
 }
 
-# Syntax Options
-SYNTAX_OPTIONS_DISPLAY = [
-    "{combined_input}",
-    "User: {combined_input}",
-    "User:\\n{combined_input}",
-    "### Human: {combined_input}",
-    "### Human:\\n{combined_input}",
-    "### Instruction: {combined_input}",
-    "### Instruction:\\n{combined_input}",
-    "{system_input}. USER: {instruct_input}",
-    "{system_input}\\nUser: {instruct_input}"
-]
-SYNTAX_OPTIONS = SYNTAX_OPTIONS_DISPLAY
-EOL
-        chmod 644 "$TEMPORARY_FILE"
-        echo "temporary.py created successfully."
-    else
-        echo "temporary.py already exists in ./data."
-    fi
+PROMPT_TO_SETTINGS = {
+    'converse': {'temperature': 0.7, 'repeat_penalty': 1.1, 'max_tokens': 2000},
+    'consolidate': {'temperature': 0.9, 'repeat_penalty': 1.0, 'max_tokens': 1000}
 }
+EOL
+    chmod 644 "$TEMPORARY_FILE"
+    echo "temporary.py created or overwritten successfully in ./data."
+}
+
 
 # Installer function
 run_installer() {
