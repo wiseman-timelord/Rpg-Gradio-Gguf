@@ -1,7 +1,7 @@
 # .\scripts\interface.py
 
 from scripts.utility import reset_session_state, write_to_yaml
-from data.temporary import session_history, agent_output, agent_name, agent_role, human_name
+from data.temporary import session_history, agent_output, agent_name, agent_role, human_name, threads_percent
 import gradio as gr
 import threading
 import time
@@ -19,7 +19,7 @@ def shutdown():
     Gracefully shuts down the application.
     """
     print("Shutting down the application...")
-    os.kill(os.getpid(), signal.SIGTERM)
+    os.kill(os.getpid(), signal.SIGTERM)  # Terminate the process
 
 def reset_session():
     """
@@ -38,15 +38,31 @@ def apply_configuration(new_agent_name, new_agent_role, new_human_name):
     human_name = new_human_name
     return "Configuration applied successfully!"
 
-def save_configuration(new_agent_name, new_agent_role, new_human_name):
+def save_configuration(new_agent_name, new_agent_role, new_human_name, new_threads_percent):
     """
     Saves configuration changes to both temporary variables and persistent.yaml.
     """
-    apply_configuration(new_agent_name, new_agent_role, new_human_name)
+    global agent_name, agent_role, human_name, threads_percent
+    agent_name = new_agent_name
+    agent_role = new_agent_role
+    human_name = new_human_name
+    threads_percent = new_threads_percent
+
     write_to_yaml('agent_name', agent_name)
     write_to_yaml('agent_role', agent_role)
     write_to_yaml('human_name', human_name)
-    return "Configuration saved successfully!"
+    write_to_yaml('threads_percent', threads_percent)
+
+    return "Configuration and thread settings saved successfully!"
+
+def save_threads_percent(new_threads_percent):
+    """
+    Saves the threads_percent setting to both temporary variables and persistent.yaml.
+    """
+    global threads_percent
+    threads_percent = new_threads_percent
+    write_to_yaml('threads_percent', threads_percent)
+    return f"Threads percentage set to {threads_percent}%."
 
 def chat_with_model(user_input):
     """
@@ -122,19 +138,33 @@ def launch_gradio_interface():
                     inputs=[],
                     outputs=[bot_response, session_history_display]
                 )
+                # Exit Button: Closes Browser Tab and Shuts Down Python Script
+                gr.HTML(
+                    value="<script>function closeTab() { window.open('','_self').close(); }</script>"
+                )
                 exit_btn.click(
-                    fn=lambda: ("Goodbye!", ""),
+                    fn=shutdown,  # Python shutdown function
                     inputs=[],
-                    outputs=[bot_response, session_history_display]
+                    outputs=[]
                 )
 
             # Tab 2: Configuration
             with gr.Tab("Configuration"):
                 gr.Markdown("# Configuration Settings")
+                
                 # Configuration Layout
                 agent_name_input = gr.Textbox(label="Agent Name", value=agent_name)
                 agent_role_input = gr.Textbox(label="Agent Role", value=agent_role)
                 human_name_input = gr.Textbox(label="Human Name", value=human_name)
+                
+                # Thread Percentage Slider
+                threads_slider = gr.Slider(
+                    label="Threads Usage (%)",
+                    minimum=10,
+                    maximum=100,
+                    step=10,
+                    value=threads_percent
+                )
 
                 with gr.Row():
                     apply_btn = gr.Button("Apply")
@@ -148,10 +178,10 @@ def launch_gradio_interface():
                 )
                 save_btn.click(
                     fn=save_configuration,
-                    inputs=[agent_name_input, agent_role_input, human_name_input],
+                    inputs=[agent_name_input, agent_role_input, human_name_input, threads_slider],
                     outputs=None
                 )
 
-    interface.launch()
-
+    # Launch the interface
+    interface.launch(inbrowser=True)
 

@@ -48,10 +48,13 @@ def reset_session_state():
 
 
 # Function to calculate optimal threads
-def calculate_optimal_threads():
+def calculate_optimal_threads(threads_percent=80):
+    """
+    Calculates the optimal number of threads to use based on the percentage provided.
+    """
     cpu_count = os.cpu_count()
-    optimal_threads = cpu_count // 2 if cpu_count > 1 else 1
-    print(f"Optimal threads calculated: {optimal_threads}")
+    optimal_threads = max(1, (cpu_count * threads_percent) // 100)
+    print(f"Optimal threads based on {threads_percent}% of {cpu_count} cores: {optimal_threads}")
     return optimal_threads
 
 def scan_models_directory(models_dir='./models'):
@@ -68,4 +71,6 @@ def scan_models_directory(models_dir='./models'):
                     'config_path': json_path
                 })
     return models
+
+
 
