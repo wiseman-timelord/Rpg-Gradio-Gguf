@@ -3,7 +3,7 @@
 
 ### Project Plans
 The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native...
-1. The `./models/model_config.json` file may also be named `./models/config.json`, ensure to check for either file, must find one of them, or raise warning sleep 3, then return to bash. Ensure to provide the config.json example, to ensure it can read this too if there are any differences in reference, reminder it uses this to configure the launching of the model.
+1. The `./models/model_config.json` file may also be named `./models/config.json`, ensure to check for either file, must find one of them, or raise warning sleep 3, then return to bash. Ensure to provide the config.json example, to ensure it can read this too, therein, I notice thre is minimal information in a `config.json`, so if either file does not have required info for model parameters, then use default for the missing parts and use the parts that were present; examine the `model_config.json` for the default parameters, and ensure to use those in the case of missing information required for model loading.
 1. Ensure the gradio interface is correctly popping up in default browser.
 2. Ensure Gradio interface has correct layout and configuration.
 3. a Gradio Interface with model is loaded, so upon proper exit, ensure the, shutdown and unload, is comprihensive in the end_of_script function..
