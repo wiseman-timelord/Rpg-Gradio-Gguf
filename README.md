@@ -94,7 +94,7 @@ Selection; Menu Options = 1-2, Exit Program = X:
 ### Requirements
 - Ubuntu - Its programmed on/towards Ubuntu 24.04-24.10.
 - Python - It uses modern versions of Python in a VENV.
-- LLMs - GGUF format with an accompanying "model_config.json" file in same dir.
+- LLMs - GGUF format with a provided, "model_config.json" or "config.json", file in same dir.
 - AMD - Programmed on AMD, not currently testing on other platforms.
 
 ### Usage
@@ -104,7 +104,9 @@ Selection; Menu Options = 1-2, Exit Program = X:
 3. the python scripts search in `./models/` for the, `*.gguf` and `model_config.json`, files, and use that.
 4. the user is presented with gradio interface popped up in default browser, and then have terminal somewhere.
 5. the buttons do what you would expect, and the interface has all basic desired options available.
-- Current testing model `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF`.
+
+### Notation
+- Current, testing and advised, model: `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF`.
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
