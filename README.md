@@ -55,7 +55,11 @@ Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate
 - Optimized for Ubuntu: Specifically tailored to Ubuntu 24.04–24.10 and AMD architecture.
 
 ### Preview
-- Alpha Gradio Interface - Looking the part...
+- Alpha Conversation Page...
+
+![preview_image](media/configuration.png)
+
+- Alpha Configuration Page...
 
 ![preview_image](media/configuration.png)
 
