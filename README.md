@@ -1,17 +1,11 @@
 # Chat-Ubuntu-Gguf
 - Status: Alpha
 
-### Project details
-The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native....
-- Gradio Interface with model is loaded, so upon proper exit, this should shutdown and unload, correctly, models and processes.
-- we have 4 python scripts in total between "./" and "./scripts", plus the 1 bash installer-launcher script in `./`, while the rest self generate in `./data`; enabling editing by anyone with max 5 files for free in claude_sonnet.
-- a rotation of 2 prompts for, conversation and consolidation of events, producing basic context aware conversations. Will investigave putting both into 1 with the the newer models.
-- the main_script checking relevant folders for required files and performing any required basic maintenance, all before popping up the gradio interface in browser.
-
 ### Project Plans
-We are at ALPHA stage...
+The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native...
 1. Ensure the gradio interface is correctly popping up in default browser.
 2. Ensure Gradio interface has correct layout and configuration.
+3. a Gradio Interface with model is loaded, so upon proper exit, ensure the, shutdown and unload, is comprihensive in the end_of_script function..
 3. Continue with, Test and Bugfix, for all features/options, until stable.
 4. Test, conversation and prompting, and examine responses, then improve.
 3. Upon correct and working version, then Optimize for Less Overall Characters, more advanced programming.
@@ -54,11 +48,15 @@ We are at ALPHA stage...
 ├── models/                    # (Empty) Directory for, `*.GGUF` and `model_config.json` ,files
 ```
 
+### Description
+Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. There are 4 python scripts in, "./" and "./scripts", and 1 bash script in `./`, enabling editing with the maximum of 5 files upload in claude_sonnet for free account, thus, able to be modified into their own custom chatbot by anyone. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. Still being created, tba.  
+
 ### FEATURES
-- Model-Driven: Focused on GGUF-format models with accompanying configuration files.
+- Model-Driven: Focused on GGUF-format models with accompanying configuration files. 
 - Gradio Interface: A browser-based interactive interface tied seamlessly into terminal operations.
 - Integrated Setup and Operation: Through a single Bash launcher script that manages installation, execution, and cleanup.
 - Folder and File Management: Automated handling of configuration files, logs, and persistent data (YAML-based).
+- 2 Prompt rotation for, conversation and consolidation, producing context aware conversation.
 - Modularity: Python scripts are designed to work together with clear roles (e.g., model handling, interface logic).
 - Persistence: Session data, settings, and configurations are retained across restarts.
 - Optimized for Ubuntu: Specifically tailored to Ubuntu 24.04–24.10 and AMD architecture.
@@ -107,7 +105,6 @@ Selection; Menu Options = 1-2, Exit Program = X:
 - the python scripts search in `./models/` for the, `*.gguf` and `model_config.json`, files, and use that.
 - the user is presented with gradio interface popped up in default browser, and then have terminal somewhere.
 - the buttons do what you would expect, and the interface has all basic desired options available.
-
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
