@@ -6,6 +6,7 @@ from scripts import utility
 import os
 import time
 import re
+import json
 import subprocess  # Corrected typo
 from data.temporary import MODE_TO_TEMPERATURE, PROMPT_TO_MAXTOKENS
 

@@ -6,6 +6,7 @@ import time
 import yaml
 import argparse
 import threading
+import webbrowser
 import gradio as gr
 from scripts import interface, model as agent_module, utility
 from data.temporary import RAMFS_DIR, PERSISTENT_FILE, session_history, agent_name, agent_role, human_name
@@ -55,29 +56,20 @@ def background_engine():
 
 # Gradio Interface Launcher with Background Engine
 def launch_gradio_with_background_engine():
-    session_state = {'rotation_counter': 0}
-
-    def chat_with_model(user_input):
-        response, session_history = handle_chat_input(
-            user_input, 
-            session_state['rotation_counter']
-        )
-        session_state['rotation_counter'] = (session_state['rotation_counter'] + 1) % 4
-        return response, session_history
-
+    """
+    Launch Gradio server and background engine, and open the browser.
+    """
+    # Start the background engine thread
     engine_thread = threading.Thread(target=background_engine, daemon=True)
     engine_thread.start()
 
-    interface = gr.Interface(
-        fn=chat_with_model,
-        inputs=gr.Textbox(lines=2, label="Your Message"),
-        outputs=[
-            gr.Textbox(lines=4, label="Response"),
-            gr.Textbox(lines=10, label="Session History")
-        ],
-        title="Chat-Ubuntu-Gguf",
-    )
-    interface.launch()
+    # Launch Gradio interface in the main thread
+    interface.launch_gradio_interface()
+
+    # Open the default browser explicitly to access Gradio
+    webbrowser.open("http://127.0.0.1:7860", new=1)
+
+
 
 def reset_keys_to_empty():
     """
