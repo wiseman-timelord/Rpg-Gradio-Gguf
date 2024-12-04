@@ -3,6 +3,7 @@
 
 ### Project Plans
 The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native...
+1. The `./models/model_config.json` file may also be named `./models/config.json`, ensure to check for either file, must find one of them, or raise warning sleep 3, then return to bash. Ensure to provide the config.json example, to ensure it can read this too if there are any differences in reference, reminder it uses this to configure the launching of the model.
 1. Ensure the gradio interface is correctly popping up in default browser.
 2. Ensure Gradio interface has correct layout and configuration.
 3. a Gradio Interface with model is loaded, so upon proper exit, ensure the, shutdown and unload, is comprihensive in the end_of_script function..
@@ -98,11 +99,12 @@ Selection; Menu Options = 1-2, Exit Program = X:
 
 ### Usage
 - No working version verified yet.
-- When it works, it will run through "sudo ./Chat-Ubuntu-Gguf.sh" in terminal in the program folder.
-- the file "Chat-Ubuntu-Gguf.sh" is a Installer and Launcher, through menu; its already done mostly.
-- the python scripts search in `./models/` for the, `*.gguf` and `model_config.json`, files, and use that.
-- the user is presented with gradio interface popped up in default browser, and then have terminal somewhere.
-- the buttons do what you would expect, and the interface has all basic desired options available.
+1. When it works, it will run through "sudo ./Chat-Ubuntu-Gguf.sh" in terminal in the program folder.
+2. the file "Chat-Ubuntu-Gguf.sh" is a Installer and Launcher, through menu; its already done mostly.
+3. the python scripts search in `./models/` for the, `*.gguf` and `model_config.json`, files, and use that.
+4. the user is presented with gradio interface popped up in default browser, and then have terminal somewhere.
+5. the buttons do what you would expect, and the interface has all basic desired options available.
+- Current testing model `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF`.
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
