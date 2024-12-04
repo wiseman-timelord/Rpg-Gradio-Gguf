@@ -85,12 +85,6 @@ Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate
 Selection; Menu Options = 1-2, Exit Program = X: 
 ```
 
-### Example Prompts
-1) "Hello there! I never thought I would see you here on the mountain..."
-2) "Wow, you can actually talk? What's your story?"
-3) "You look wise, do you have any ancient wisdom to share?"
-4) "Tell me, Wise-Llama, what is the purpose of humanity?"
-
 ### Requirements
 - Ubuntu - Its programmed on/towards Ubuntu 24.04-24.10.
 - Python - It uses modern versions of Python in a VENV.
@@ -105,8 +99,14 @@ Selection; Menu Options = 1-2, Exit Program = X:
 4. the user is presented with gradio interface popped up in default browser, and then have terminal somewhere.
 5. the buttons do what you would expect, and the interface has all basic desired options available.
 
+### Example Prompts
+1) "Hello there! I never thought I would see you here on the mountain..."
+2) "Wow, you can actually talk? What's your story?"
+3) "You look wise, do you have any ancient wisdom to share?"
+4) "Tell me, Wise-Llama, what is the purpose of humanity?"
+
 ### Notation
-- Current, testing and advised, model: `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF`.
+- Current, testing and advised, model(s): `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF`.
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
