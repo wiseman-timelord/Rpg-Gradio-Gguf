@@ -3,21 +3,25 @@
 
 ### Project details
 The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native....
-- Gradio Interface is in runspace and the bash identifies the process upon launching the gradio interface, so proper bash exit will shutdown the runspace process. this will enable the terminal to display updates while gradio interface runs, but will require consideration in scripts. 
-- additional scripts are generated as required, and placed in data folder, such as the yaml for persistent settings.
+- Gradio Interface with model is loaded, so upon proper exit, this should shutdown and unload, correctly, models and processes.
 - we have 4 python scripts in total between "./" and "./scripts", plus the 1 bash installer-launcher script in `./`, while the rest self generate in `./data`; enabling editing by anyone with max 5 files for free in claude_sonnet.
 - a rotation of 2 prompts for, conversation and consolidation of events, producing basic context aware conversations. Will investigave putting both into 1 with the the newer models.
 - the main_script checking relevant folders for required files and performing any required basic maintenance, all before popping up the gradio interface in browser.
 
 ### Project Plans
 We are at ALPHA stage...
-1. Continue with, Test and Bugfix, until stable
-3. Optimize for Less Overall Characters, more advanced programming.
-2. Test and Bugfix, all options and features, soes everything works.
-4. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located.
-2. Test and Bugfix, all options and features, soes everything works.
+1. Ensure the gradio interface is correctly popping up in default browser.
+2. Ensure Gradio interface has correct layout and configuration.
+3. Continue with, Test and Bugfix, for all features/options, until stable.
+4. Test, conversation and prompting, and examine responses, then improve.
+3. Upon correct and working version, then Optimize for Less Overall Characters, more advanced programming.
+2. Test and Bugfix, all options and features, soes everything still works.
+4. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script.
+2. Test and Bugfix, all options and features, soes everything still works.
 2. Release.
-5. work on modular features, ie, voice/image recognition and voice/image genearion. 
+5. work on expansion of features, this will require a list of wanted features, then break down to, least code and best advantage, to round off features.
+6. release final version.
+8. update for new models as required.
 
 ### File Structure
 - Initial File Structure...
