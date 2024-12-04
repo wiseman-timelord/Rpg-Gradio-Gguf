@@ -3,6 +3,7 @@
 # imports
 from llama_cpp import Llama
 from scripts import utility
+from gguf_parser import GGUFParser
 import os
 import time
 import re
@@ -33,48 +34,50 @@ def process_selected_model(models_dir='./models'):
 
 
 # initialize the model
-def initialize_model(models_dir='./models', optimal_threads=None):
+def initialize_model(models_dir='./models'):
     """
-    Initializes a GGUF model using the configuration from model_config.json.
+    Initializes a GGUF model, extracting metadata using gguf-parser.
+    Optionally uses configuration files for additional overrides.
     """
-    global model
     try:
-        # Scan the models directory
-        models = utility.scan_models_directory(models_dir)
-        if not models:
-            raise FileNotFoundError("No valid GGUF model and model_config.json found in the models directory.")
+        # Locate GGUF file
+        gguf_files = [f for f in os.listdir(models_dir) if f.endswith('.gguf')]
+        if not gguf_files:
+            raise FileNotFoundError("No GGUF model files found in the directory.")
         
-        # Select the first valid model (adjust if multiple models need handling)
-        selected_model = models[0]
-        model_path = selected_model['model_path']
-        config_path = selected_model['config_path']
+        model_path = os.path.join(models_dir, gguf_files[0])
+        print(f"Using GGUF model file: {model_path}")
 
-        # Load configuration
-        with open(config_path, 'r') as config_file:
-            config = json.load(config_file)
+        # Parse metadata from GGUF file
+        parser = GGUFParser(model_path)
+        parser.parse()
+        metadata = parser.get_metadata()
 
-        # Extract and override relevant parameters
-        n_ctx = config["load_params"].get("n_ctx", 8192)
-        n_batch = config["load_params"].get("n_batch", 512)
-        use_mmap = config["load_params"].get("use_mmap", True)
+        # Display GGUF metadata
+        print("Metadata extracted from GGUF file:")
+        for key, value in metadata.items():
+            print(f"{key}: {value}")
 
-        print(f"Initializing model: {model_path} with context: {n_ctx}, batch: {n_batch}")
-        model = Llama(
-            model_path=model_path,
-            n_ctx=n_ctx,
-            n_batch=n_batch,
-            use_mmap=use_mmap,
-            use_mlock=False  # Override mlock to False
-        )
+        # Check for optional config files
+        config_files = [os.path.join(models_dir, f) for f in ('model_config.json', 'config.json') if os.path.exists(os.path.join(models_dir, f))]
+        if config_files:
+            with open(config_files[0], 'r') as config_file:
+                config_data = json.load(config_file)
+            print("Configuration file data:", json.dumps(config_data, indent=2))
+
+            # Merge config data into metadata
+            metadata.update(config_data)
+
+        # Initialize model (use metadata as needed for your library)
+        print("Initializing model with the following parameters:")
+        print(metadata)
+
+        # Example: Use metadata to initialize a model object
+        # model = YourModelLibrary(model_path=model_path, **metadata)
+
         print("Model initialized successfully.")
-        utility.write_to_yaml('model_path', model_path)
-        utility.write_to_yaml('n_ctx', n_ctx)
-        utility.write_to_yaml('n_batch', n_batch)
-
     except Exception as e:
         print(f"Error during model initialization: {e}")
-        utility.write_to_yaml('error_log', f"Model initialization error: {e}")
-        model = None
 
 
 def run_llama_cli(prompt, max_tokens, temperature):
