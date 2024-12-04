@@ -60,6 +60,10 @@ We are at ALPHA stage...
 - Optimized for Ubuntu: Specifically tailored to Ubuntu 24.04–24.10 and AMD architecture.
 
 ### Preview
+- Alpha Gradio Interface - First working version...
+
+![preview_image](media/preview.png)
+
 - The Installer-Launcher is done mostly, improvements possible...
 ```
 ================================================================================
