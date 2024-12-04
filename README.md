@@ -3,7 +3,6 @@
 
 ### Project Plans
 The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native...
-1. The `./models/model_config.json` file may also be named `./models/config.json`, ensure to check for either file, must find one of them, or raise warning sleep 3, then return to bash. Ensure to provide the config.json example, to ensure it can read this too, therein, I notice thre is minimal information in a `config.json`, so if either file does not have required info for model parameters, then use default for the missing parts and use the parts that were present; examine the `model_config.json` for the default parameters, and ensure to use those in the case of missing information required for model loading. A better idea would be to use whatever libraries we can to determine information about the gguf model, and use what information we can from that to complete missing information, before resulting to "defaults" to fill in remaining gaps. It also should be reporting upon what its doing with, concise printed text and short sleep periods, so the user knows whats going on. This will require a test script to use on my config.json model to determine what information the python libraries can find out by inspecting a model.
 1. Ensure the gradio interface is correctly popping up in default browser. 
 2. Ensure Gradio interface has correct layout and configuration.
 3. a Gradio Interface with model is loaded, so upon proper exit, ensure the, shutdown and unload, is comprihensive in the end_of_script function..
@@ -51,7 +50,7 @@ The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 nat
 Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. There are 4 python scripts in, "./" and "./scripts", and 1 bash script in `./`, enabling editing with the maximum of 5 files upload in claude_sonnet for free account, thus, able to be modified into their own custom chatbot by anyone. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. Still being created, tba.  
 
 ### FEATURES
-- Model-Driven: Focused on GGUF-format models with accompanying configuration files. 
+- Gguf Models: Using, Gguf-Parser and accompanying json files, auto-configuring model parameters. 
 - Gradio Interface: A browser-based interactive interface tied seamlessly into terminal operations.
 - Integrated Setup and Operation: Through a single Bash launcher script that manages installation, execution, and cleanup.
 - Folder and File Management: Automated handling of configuration files, logs, and persistent data (YAML-based).
