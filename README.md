@@ -86,12 +86,12 @@ Selection; Menu Options = 1-2, Exit Program = X:
 - AMD - Programmed on AMD, not currently testing on other platforms.
 
 ### Usage
-- No working version verified yet.
 1. When it works, it will run through "sudo ./Chat-Ubuntu-Gguf.sh" in terminal in the program folder.
-2. the file "Chat-Ubuntu-Gguf.sh" is a Installer and Launcher, through menu; its already done mostly.
-3. the python scripts search in `./models/` for the, `*.gguf` and `model_config.json`, files, and use that.
-4. the user is presented with gradio interface popped up in default browser, and then have terminal somewhere.
-5. the buttons do what you would expect, and the interface has all basic desired options available.
+2. the Installer/Launcher runs, and you should select `2` to, install requirements and setup files/folders.
+3. You should then insert your `*.gguf`, and if present then, `config.json` or `model_config.json`, to the `./models` folder that was created.
+4. You should then select `1` from the menu to run the main program, and a browser window should pop-up, but in failing that then right click on `http://127.0.0.1:7860` in the terminal and go to `Open Link` to do the same.
+5. You will then be interacting with the browser interface, where the buttons do what you would expect, and most desired options are available.
+6. After finishing your session, then click on `Exit Program` in the browser window, and then the terminal will return to the Bash menu, and then select `X` to exit correctly. 
 
 ### Example Prompts
 1) "Hello there! I never thought I would see you here on the mountain..."
