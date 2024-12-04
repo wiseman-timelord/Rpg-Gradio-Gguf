@@ -11,8 +11,6 @@ The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 nat
 
 ### Project Plans
 We are at ALPHA stage...
-- Done for next update: Errors fixed, removal of ramfs (will re-implement later), improvement/correction of bash functions, reduced scripts to 5 inc bash.
-- Working on Next...
 1. Continue with, Test and Bugfix, until stable
 3. Optimize for Less Overall Characters, more advanced programming.
 2. Test and Bugfix, all options and features, soes everything works.
