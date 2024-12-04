@@ -9,7 +9,8 @@ import threading
 import webbrowser
 import gradio as gr
 from scripts import interface, model as agent_module, utility
-from data.temporary import PERSISTENT_FILE, session_history, agent_name, agent_role, human_name
+from data.temporary import PERSISTENT_FILE, session_history, agent_name, agent_role, human_name, threads_percent, optimal_threads
+import data.temporary as temporary
 from scripts.utility import read_yaml, write_to_yaml
 
 
@@ -26,7 +27,7 @@ def load_persistent_settings():
     """
     Loads persistent settings from persistent.yaml and updates the corresponding temporary variables.
     """
-    global agent_name, agent_role, human_name, session_history
+    global agent_name, agent_role, human_name, session_history, threads_percent
 
     if not os.path.exists(PERSISTENT_FILE):
         print(f"Error: Persistent file {PERSISTENT_FILE} not found. Please run the setup installer.")
@@ -36,8 +37,15 @@ def load_persistent_settings():
     agent_name = persistent_data.get('agent_name', 'Empty')
     agent_role = persistent_data.get('agent_role', 'Empty')
     human_name = persistent_data.get('human_name', 'Empty')
-    session_history = persistent_data.get('session_history', session_history)  # Default to initial value
+    threads_percent = persistent_data.get('threads_percent', 80)  # Default 80%
+    session_history = persistent_data.get('session_history', session_history)
 
+    # Calculate the actual number of threads to use
+    total_threads = os.cpu_count()
+    optimal_threads = max(1, (total_threads * threads_percent) // 100)
+    print(f"Using {optimal_threads} threads out of {total_threads} ({threads_percent}%)")
+    temporary.threads_percent = threads_percent
+    temporary.optimal_threads = optimal_threads
 
 def save_persistent_settings():
     """

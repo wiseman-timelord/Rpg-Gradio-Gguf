@@ -38,7 +38,7 @@ create_data_init_py() {
 # This file is auto-generated to mark this directory as a Python package.
 EOL
     chmod 644 "$INIT_FILE"
-    echo "__init__.py created or overwritten successfully in ./data."
+    echo "__init__.py created successfully in ./data."
 }
 
 
@@ -52,9 +52,10 @@ create_persistent_yaml() {
 human_name: "Human"
 agent_name: "Wise-Llama"
 agent_role: "Wise Oracle"
+threads_percent: 80
 EOL
     chmod 666 "$PERSISTENT_FILE"
-    echo "persistent.yaml created or overwritten successfully with default configuration."
+    echo "persistent.yaml created successfully in ./data."
 }
 
 # Function to create temporary.py in ./data
@@ -69,17 +70,19 @@ create_temporary_py() {
 PERSISTENT_FILE = "./data/persistent.yaml"
 
 # General Variables
-session_history = "the conversation started"  # Default: "the conversation started"
+session_history = "the conversation started"
 rotation_counter = 0
+optimal_threads = 4
 
 # Model Variables
 loaded_models = {}
 llm = None
 
 # Configurable Keys
-agent_name = "Empty"
-agent_role = "Empty"
-human_name = "Empty"
+agent_name = "Computer"
+agent_role = "The Personal Computer belonging to Human"
+human_name = "Human"
+threads_percent = 80
 
 # Other Keys
 agent_output = ""
@@ -109,7 +112,7 @@ PROMPT_TO_SETTINGS = {
 }
 EOL
     chmod 644 "$TEMPORARY_FILE"
-    echo "temporary.py created or overwritten successfully in ./data."
+    echo "temporary.py created successfully in ./data."
 }
 
 
@@ -206,7 +209,7 @@ launch_program() {
     sleep 2
     python3 main_script.py --gui
     if [ $? -ne 0 ]; then
-        echo "Error: Main program execution failed. Exiting..."
+        echo "Main program exited. Shutting down..."
         End_Of_Script
     fi
 
