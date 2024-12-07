@@ -93,20 +93,18 @@ SYNTAX_OPTIONS = [
     "User:\\n{combined_input}"
 ]
 
-# Settings
-MODE_TO_TEMPERATURE = {
-    'RolePlaying': 0.7,
-    'TextProcessing': 0.1
-}
-
-PROMPT_TO_MAXTOKENS = {
-    'converse': 2000,
-    'consolidate': 1000
-}
-
+# Consolidated Prompt Settings
 PROMPT_TO_SETTINGS = {
-    'converse': {'temperature': 0.7, 'repeat_penalty': 1.1, 'max_tokens': 2000},
-    'consolidate': {'temperature': 0.9, 'repeat_penalty': 1.0, 'max_tokens': 1000}
+    'converse': {
+        'temperature': 0.5,
+        'repeat_penalty': 1.2,
+        'max_tokens': 250
+    },
+    'consolidate': {
+        'temperature': 0.1,
+        'repeat_penalty': 1.1,
+        'max_tokens': 500
+    }
 }
 
 EOL
