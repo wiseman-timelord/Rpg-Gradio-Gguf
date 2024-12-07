@@ -2,4 +2,4 @@ llama-cpp-python
 gradio
 watchdog
 PyYAML
-
+gguf-parser

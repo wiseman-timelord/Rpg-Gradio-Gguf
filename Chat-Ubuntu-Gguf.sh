@@ -22,7 +22,7 @@ ensure_data_directory() {
     if [ ! -d "./data" ]; then
         echo "Creating ./data directory..."
         mkdir ./data
-        chmod 755 ./data
+        chmod 777 ./data
         echo "./data directory created successfully."
     else
         echo "./data directory already exists."
@@ -37,7 +37,7 @@ create_data_init_py() {
     cat > "$INIT_FILE" <<EOL
 # This file is auto-generated to mark this directory as a Python package.
 EOL
-    chmod 644 "$INIT_FILE"
+    chmod 777 "$INIT_FILE"
     echo "__init__.py created successfully in ./data."
 }
 
@@ -54,7 +54,7 @@ agent_name: "Wise-Llama"
 agent_role: "Wise Oracle"
 threads_percent: 80
 EOL
-    chmod 666 "$PERSISTENT_FILE"
+    chmod 777 "$PERSISTENT_FILE"
     echo "persistent.yaml created successfully in ./data."
 }
 
@@ -66,9 +66,6 @@ create_temporary_py() {
     cat > "$TEMPORARY_FILE" <<EOL
 # Temporary variables for Chat-Ubuntu-Gguf
 
-# Paths
-PERSISTENT_FILE = "./data/persistent.yaml"
-
 # General Variables
 session_history = "the conversation started"
 rotation_counter = 0
@@ -76,7 +73,8 @@ optimal_threads = 4
 
 # Model Variables
 loaded_models = {}
-llm = None
+large_language_model = None  # Renamed model instance
+model_used = False           # Flag to track if the model is used
 
 # Configurable Keys
 agent_name = "Computer"
@@ -110,8 +108,9 @@ PROMPT_TO_SETTINGS = {
     'converse': {'temperature': 0.7, 'repeat_penalty': 1.1, 'max_tokens': 2000},
     'consolidate': {'temperature': 0.9, 'repeat_penalty': 1.0, 'max_tokens': 1000}
 }
+
 EOL
-    chmod 644 "$TEMPORARY_FILE"
+    chmod 777 "$TEMPORARY_FILE"
     echo "temporary.py created successfully in ./data."
 }
 
@@ -125,7 +124,7 @@ run_installer() {
     if [ ! -d "./logs" ]; then
         echo "Creating ./logs directory..."
         mkdir ./logs
-        chmod 755 ./logs
+        chmod 777 ./logs
         echo "./logs directory created."
     else
         echo "./logs directory already exists."
@@ -136,7 +135,7 @@ run_installer() {
     if [ ! -d "./models" ]; then
         echo "Creating ./models directory..."
         mkdir ./models
-        chmod 755 ./models
+        chmod 777 ./models
         echo "./models directory created."
     else
         echo "./models directory already exists."
