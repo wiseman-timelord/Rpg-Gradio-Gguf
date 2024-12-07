@@ -1,50 +1,37 @@
 # .\scripts\utility.py
 
-# Imports
 import yaml
 import os
 import time
 from data.temporary import session_history, agent_output, human_input
 
-# Define the RAMFS directory
-RAMFS_DIR = '/mnt/ramfs'
-
 # Function to read YAML file
 def read_yaml(file_path='./data/persistent.yaml'):
     """
     Reads the YAML file and returns its contents as a dictionary.
+    If the file does not exist, return an empty dictionary.
     """
     try:
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"{file_path} does not exist.")
         with open(file_path, 'r') as file:
             return yaml.safe_load(file)
+    except FileNotFoundError:
+        print(f"Warning: {file_path} does not exist. Returning empty configuration.")
+        return {}
     except Exception as e:
         print(f"Error reading YAML: {e}")
         return {}
 
 def write_to_yaml(key, value, file_path='./data/persistent.yaml'):
-    """
-    Writes a key-value pair to the YAML file.
-    """
     try:
         data = read_yaml(file_path) or {}
+        if key == 'session_history' and not value.strip():
+            value = "the conversation started"
         data[key] = value
         with open(file_path, 'w') as file:
             yaml.safe_dump(data, file)
     except Exception as e:
         print(f"Error writing to YAML: {e}")
 
-
-# reset
-def reset_session_state():
-    """
-    Resets session-specific variables to their default values.
-    """
-    global session_history, agent_output, human_input
-    session_history = "the conversation started"
-    agent_output = ""
-    human_input = ""
 
 
 # Function to calculate optimal threads
@@ -57,10 +44,15 @@ def calculate_optimal_threads(threads_percent=80):
     print(f"Optimal threads based on {threads_percent}% of {cpu_count} cores: {optimal_threads}")
     return optimal_threads
 
+# Resets session-specific variables to their default values
+def reset_session_state():
+    global session_history, agent_output, human_input
+    session_history = "the conversation started"
+    agent_output = ""
+    human_input = ""
+
+# Scans the models directory for GGUF models and their corresponding JSON configs
 def scan_models_directory(models_dir='./models'):
-    """
-    Scans the models directory for GGUF models and their corresponding JSON configs.
-    """
     models = []
     for file in os.listdir(models_dir):
         if file.endswith('.gguf'):
@@ -71,6 +63,3 @@ def scan_models_directory(models_dir='./models'):
                     'config_path': json_path
                 })
     return models
-
-
-
