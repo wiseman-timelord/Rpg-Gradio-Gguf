@@ -2,7 +2,7 @@
 - Status: Alpha
 
 ### Project Plans
-The, conversion and re-engineer, of my WSL based ChatBot, to being Ubuntu 24 native...
+The current plan for work is...
 1. Correct Prompting, currently its able to, rotate prompts and prompt model, but not correctly (see pictures).
 3. Upon correct and working version, then Optimize for Less Overall Characters, more advanced programming. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script.
 2. Test and Bugfix, all options and features, soes everything still works.
