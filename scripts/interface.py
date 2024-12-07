@@ -20,14 +20,14 @@ def reset_session():
     Does NOT save to persistent.yaml automatically. Keeps it ephemeral.
     """
     reset_session_state()  # Resets session_history, agent_output, human_input in data.temporary
-    data.temporary.rotation_counter = 0
+    temporary.rotation_counter = 0
     # Return updated interface fields without writing to YAML
-    return "", data.temporary.session_history
+    return "", temporary.session_history
 
 def apply_configuration(new_agent_name, new_agent_role, new_human_name):
-    data.temporary.agent_name = new_agent_name
-    data.temporary.agent_role = new_agent_role
-    data.temporary.human_name = new_human_name
+    temporary.agent_name = new_agent_name
+    temporary.agent_role = new_agent_role
+    temporary.human_name = new_human_name
     return "Configuration applied successfully (Not saved yet)."
 
 def save_configuration(new_agent_name, new_agent_role, new_human_name, new_threads_percent, new_session_history):
@@ -35,11 +35,11 @@ def save_configuration(new_agent_name, new_agent_role, new_human_name, new_threa
     Saves agent configuration and session settings to persistent.yaml.
     This is explicitly triggered by the user.
     """
-    data.temporary.agent_name = new_agent_name
-    data.temporary.agent_role = new_agent_role
-    data.temporary.human_name = new_human_name
-    data.temporary.threads_percent = int(new_threads_percent)
-    data.temporary.session_history = new_session_history
+    temporary.agent_name = new_agent_name
+    temporary.agent_role = new_agent_role
+    temporary.human_name = new_human_name
+    temporary.threads_percent = int(new_threads_percent)
+    temporary.session_history = new_session_history
 
     # Now actually save to persistent.yaml
     from main_script import save_persistent_settings
@@ -48,29 +48,35 @@ def save_configuration(new_agent_name, new_agent_role, new_human_name, new_threa
 
 def chat_with_model(user_input):
     """
-    Sends user input to the model and updates ephemeral session state.
-    Does NOT write to persistent.yaml automatically.
+    Handles the chat interaction: sends user input to the model and processes responses.
     """
     if not user_input.strip():
         return "Error: Input cannot be empty.", temporary.session_history
 
-    temporary.human_input = user_input
+    # Update the human_input variable
+    temporary.human_input = user_input.strip()
+    print(f"[DEBUG] Updated human_input: {temporary.human_input}")  # Debugging line
+
     temporary.rotation_counter += 1
 
-    # Prompt the model
+    # First, get the response from 'converse'
     converse_result = prompt_response('converse', temporary.rotation_counter)
     if 'error' in converse_result:
         return f"Error in model response: {converse_result['error']}", temporary.session_history
 
     temporary.agent_output = converse_result['agent_response']
-
-    # Update ephemeral session history
-    # We'll store history in-memory only.
-    # If user chooses to save settings later, the updated session_history is saved then.
+    # Update session history with both input and output
     temporary.session_history += f"\n{temporary.human_input}\n{temporary.agent_output}"
+    print(f"[DEBUG] Updated session history after converse:\n{temporary.session_history}")
 
-    # Return updated values for UI display
+    # Now call the 'consolidate' prompt
+    consolidate_result = prompt_response('consolidate', temporary.rotation_counter)
+    if 'error' in consolidate_result:
+        return f"Error in model consolidation: {consolidate_result['error']}", temporary.session_history
+
+    # The 'consolidate' response is already appended to session_history in `prompt_response`
     return temporary.agent_output, temporary.session_history
+
 
 def launch_gradio_interface():
     # Ensure data is re-synced with the latest settings, although this might be redundant

@@ -1,4 +1,4 @@
-# .\scripts\model.py
+# scripts/model.py
 
 from llama_cpp import Llama
 from scripts import utility
@@ -6,7 +6,7 @@ from gguf_parser import GGUFParser
 import os
 import re
 import json
-from data.temporary import MODE_TO_TEMPERATURE, PROMPT_TO_SETTINGS, large_language_model, model_used
+from data.temporary import PROMPT_TO_SETTINGS, large_language_model, model_used
 from scripts.utility import calculate_optimal_threads, read_yaml
 
 def process_selected_model(models_dir='./models'):
@@ -47,6 +47,7 @@ def process_selected_model(models_dir='./models'):
     print("Model initialized successfully.")
 
 def initialize_model(model_path, n_ctx, n_threads):
+    global large_language_model, model_used
     print("Initializing model...")
     large_language_model = Llama(
         model_path=model_path,
@@ -80,78 +81,85 @@ def run_llama_cli(prompt, max_tokens=2000, temperature=0.7, repeat_penalty=1.1):
         print(f"Error during inference: {e}")
         return f"Error: Could not generate a response due to: {e}"
 
-
 def read_and_format_prompt(file_name, data, task_name):
     """
     Reads and formats the prompt template from the given file_name using the data dictionary.
     """
     try:
         with open(file_name, "r") as file:
-            lines = file.readlines()
+            template = file.read()
 
-        system_input = ""
-        instruct_input = ""
-        reading_system = False
-        reading_instruct = False
-        for line in lines:
-            if "SYSTEM:" in line:
-                reading_system = True
-                reading_instruct = False
-                continue
-            elif "INSTRUCTION:" in line:
-                reading_system = False
-                reading_instruct = True
-                continue
-            if reading_system:
-                system_input += line.strip().format(**data) + " "
-            elif reading_instruct:
-                instruct_input += line.strip().format(**data) + " "
-
-        # Use a consistent syntax. For now let's embed in a standard template:
-        # The code below was simplified to always wrap system and instruction in [INST] tags as per original code.
-        formatted_prompt = f"[INST] <<SYS>>\n{system_input}\n<</SYS>>\n{instruct_input}[/INST]"
+        # Replace placeholders with values from the data dictionary
+        formatted_prompt = template.format(**data)
         return formatted_prompt
     except FileNotFoundError:
         print(f"Error: {file_name} not found.")
         return None
-
+    except KeyError as e:
+        print(f"Error: Missing key {e} in data for prompt formatting.")
+        return None
 
 def log_message(message, log_type, prompt_name=None, event_name=None, enable_logging=False):
-    # As before, optional logging functionality
+    # Optional logging functionality can be implemented here
     pass
-
 
 def parse_agent_response(raw_agent_response, data):
     # Cleans up raw_agent_response as before
     cleaned_response = raw_agent_response.strip()
-    # ... (All the regex replacements as before)
+    # Example: Remove any unwanted prefixes or formatting
     cleaned_response = re.sub(r'^### .*:\n', '', cleaned_response, flags=re.MULTILINE)
     return cleaned_response
 
-
 def prompt_response(task_name, rotation_counter, enable_logging=False, save_to=None):
-    data = utility.read_yaml()
-    if data is None:
-        return {"error": "Could not read config file."}
+    from data import temporary  # Import here to avoid circular imports
 
-    prompt_settings = PROMPT_TO_SETTINGS.get(task_name, {'temperature':0.7, 'repeat_penalty':1.1, 'max_tokens':2000})
+    # Build runtime data
+    runtime_data = {
+        'agent_name': temporary.agent_name or "Agent",
+        'agent_role': temporary.agent_role or "Assistant",
+        'human_name': temporary.human_name or "User",
+        'session_history': temporary.session_history or "No prior conversation.",
+        'human_input': temporary.human_input or "No input provided.",
+        'agent_output': temporary.agent_output or "No response generated."
+    }
+
+    prompt_settings = PROMPT_TO_SETTINGS.get(task_name)
+    if not prompt_settings:
+        print(f"[ERROR] No settings found for task '{task_name}'.")
+        return {"error": f"No settings found for task '{task_name}'."}
+
     temperature = prompt_settings.get('temperature', 0.7)
     repeat_penalty = prompt_settings.get('repeat_penalty', 1.1)
     max_tokens = prompt_settings.get('max_tokens', 2000)
 
-    prompt_file = f"./prompts/{task_name}.txt"  # Ensure prompt files are in ./prompts/
-    formatted_prompt = read_and_format_prompt(prompt_file, data, task_name)
-    if not os.path.exists(prompt_file) or formatted_prompt is None:
+    prompt_file = f"./prompts/{task_name}.txt"
+
+    formatted_prompt = read_and_format_prompt(prompt_file, runtime_data, task_name)
+    if formatted_prompt is None:
+        print(f"[ERROR] Prompt formatting failed for '{task_name}'.")
         return {"error": f"Prompt file {prompt_file} not found or failed to format."}
 
+    # Print formatted prompt just before sending to the model
+    print(f"[INFO] Sending prompt ({task_name}) to model:\n{formatted_prompt}\n")
+
     raw_agent_response = run_llama_cli(formatted_prompt, max_tokens, temperature, repeat_penalty)
-    parsed_response = parse_agent_response(raw_agent_response, data)
+
+    # Print raw model response
+    print(f"[INFO] Raw model response for task '{task_name}':\n{raw_agent_response}\n")
+
+    if "Error:" in raw_agent_response:
+        print(f"[ERROR] Model returned an error for '{task_name}': {raw_agent_response}")
+        return {"error": raw_agent_response}
+
+    parsed_response = parse_agent_response(raw_agent_response, runtime_data)
+
+    # Take only the first line of the response
+    parsed_response = parsed_response.split('\n', 1)[0].strip()
 
     if save_to:
         utility.write_to_yaml(save_to, parsed_response)
 
-    # If we are consolidating, update session_history
     if task_name == 'consolidate':
-        utility.write_to_yaml('session_history', parsed_response)
+        temporary.session_history += f"\n{parsed_response}"
 
     return {'agent_response': parsed_response}
