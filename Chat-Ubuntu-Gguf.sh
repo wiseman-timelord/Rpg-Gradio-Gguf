@@ -48,10 +48,11 @@ create_persistent_yaml() {
     local PERSISTENT_FILE="./data/persistent.yaml"
     echo "Creating or overwriting persistent.yaml in ./data"
     cat > "$PERSISTENT_FILE" <<EOL
-# DEFAULT_CONFIG:
+# ./data/persistent.yaml - default session config:
 human_name: "Human"
 agent_name: "Wise-Llama"
-agent_role: "Wise Oracle"
+agent_role: "A wise oracle of sorts"
+session_history = "The conversation started"
 threads_percent: 80
 EOL
     chmod 777 "$PERSISTENT_FILE"
@@ -77,9 +78,10 @@ large_language_model = None  # Renamed model instance
 model_used = False           # Flag to track if the model is used
 
 # Configurable Keys
-agent_name = "Computer"
-agent_role = "The Personal Computer belonging to Human"
+agent_name = "Wise-Llama"
+agent_role = "A wise oracle of sorts"
 human_name = "Human"
+session_history = "the conversation started"
 threads_percent = 80
 
 # Other Keys
@@ -90,7 +92,7 @@ human_input = ""
 SYNTAX_OPTIONS = [
     "{combined_input}",
     "User: {combined_input}",
-    "User:\\n{combined_input}"
+    "User:\n{combined_input}"
 ]
 
 # Consolidated Prompt Settings
@@ -106,7 +108,6 @@ PROMPT_TO_SETTINGS = {
         'max_tokens': 500
     }
 }
-
 EOL
     chmod 777 "$TEMPORARY_FILE"
     echo "temporary.py created successfully in ./data."
@@ -115,6 +116,11 @@ EOL
 
 # Installer function
 run_installer() {
+    clear
+    echo "================================================================================"
+    echo "    Chat-Ubuntu-Gguf - Installer"
+    echo "================================================================================"
+    echo ""
     echo "Running the Setup-Installer..."
     sleep 1
 
@@ -185,6 +191,11 @@ run_installer() {
 
 # Launch function
 launch_program() {
+    clear
+    echo "================================================================================"
+    echo "    Chat-Ubuntu-Gguf - Launcher"
+    echo "================================================================================"
+    echo ""
     echo "Preparing to launch the main program..."
 
     echo "Verifying virtual environment..."
@@ -237,10 +248,12 @@ check_sudo
 while true; do
     clear
     echo "================================================================================"
-    echo "    Chat-Ubuntu-Gguf"
+    echo "    Chat-Ubuntu-Gguf - Bash Menu"
     echo "================================================================================"
     echo ""
     echo ""
+    echo "" 
+    echo "" 
     echo "" 
     echo ""
     echo "    1. Launch Main Program"
@@ -248,7 +261,9 @@ while true; do
     echo "    2. Run Setup-Installer"
     echo ""
     echo "" 
+    echo "" 
     echo ""
+    echo "" 
     echo ""
     echo ""
     echo "--------------------------------------------------------------------------------"

@@ -24,7 +24,6 @@ def load_and_initialize_model():
 def load_persistent_settings():
     """
     Loads persistent settings from persistent.yaml and updates the corresponding temporary variables.
-    This does not save any changes back to persistent.yaml, just reads from it.
     """
     try:
         persistent_data = read_yaml('./data/persistent.yaml')
@@ -32,16 +31,17 @@ def load_persistent_settings():
         print("Error: Persistent file not found. Please run the setup installer.")
         exit(1)
 
-    # Update variables from persistent data
+    # Update temporary variables from persistent data
     data.temporary.agent_name = persistent_data.get('agent_name', data.temporary.agent_name)
     data.temporary.agent_role = persistent_data.get('agent_role', data.temporary.agent_role)
     data.temporary.human_name = persistent_data.get('human_name', data.temporary.human_name)
-    data.temporary.session_history = persistent_data.get('session_history', data.temporary.session_history)
+    data.temporary.session_history = persistent_data.get('session_history', "The conversation started")
     data.temporary.threads_percent = persistent_data.get('threads_percent', data.temporary.threads_percent)
 
     total_threads = os.cpu_count()
     data.temporary.optimal_threads = max(1, (total_threads * data.temporary.threads_percent) // 100)
     print(f"Using {data.temporary.optimal_threads} threads out of {total_threads} ({data.temporary.threads_percent}%)")
+
 
 def save_persistent_settings():
     """
