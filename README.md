@@ -50,10 +50,10 @@ Selection; Menu Options = 1-2, Exit Program = X:
 ```
 
 ### Requirements
-- Ubuntu - Its programmed on/towards Ubuntu 24.04-24.10.
-- Python - It uses modern versions of Python in a VENV.
+- Linux OS - Personally using Ubuntu 24.10, likely other Linux work.
+- Python - Python is installed to `./VENV` does not affect system.
 - LLMs - GGUF format Large Language Models, it will detect parameters.
-- AMD - Created and Tested on AMD CPU, not testing on other hardware.
+- CPU - Tested on AMD x3900 CPU, llama-cpp-python supports others.
 
 ### Usage
 1. Download the release, and then unpack to a sensible folder somewhere, then open a terminal in that folder.
