@@ -1,43 +1,5 @@
 # Chat-Ubuntu-Gguf
-- Status: Alpha
-
-### Project Plans
-The current plan for work is...
-1. Correct Prompting, currently its able to, rotate prompts and prompt model, but not correctly (see pictures).
-3. Upon correct and working version, then Optimize for Less Overall Characters, more advanced programming. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script.
-2. Test and Bugfix, all options and features, soes everything still works.
-2. Release.
-5. work on expansion of features, this will require a list of wanted features, then break down to, least code and best advantage, to round off features.
-6. release final version.
-
-### File Structure
-- Initial File Structure...
-```
-./
-├── Chat-Ubuntu-Gguf.sh        # Main Bash launcher script
-├── main_script.py             # Entry point script
-├── requirements.txt           # Dependencies for the virtual environment
-├── prompts/
-│   ├── consolidate.txt        # Prompt template for consolidation tasks
-│   ├── converse.txt           # Prompt template for conversation tasks
-├── scripts/
-│   ├── interface.py           # Gradio interface logic
-│   ├── model.py               # GGUF model handling and interaction
-│   ├── utility.py             # Utility functions
-└── LICENSE.txt                # License file for the project
-```
-- Files Created by Installation...
-```
-./
-├── data/
-│   ├── temporary.py           # Holds ALL global variables
-│   ├── __init__.py            # to mark the directory as a Python package
-│   ├── persistent.yaml        # Holds default Chatbot configuration
-├── venv/                      # Venv local install folder avoiding system conflict.
-│   ├── *                      # Various libraries installed from `./requirements.txt`.
-├── logs/                      # (Empty) Will contain any produced log files.
-├── models/                    # (Empty) Directory for, `*.GGUF` and `model_config.json` ,files
-```
+- Status: Working
 
 ### Description
 Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. There are 4 python scripts in, "./" and "./scripts", and 1 bash script in `./`, enabling editing with the maximum of 5 files upload in claude_sonnet for free account, thus, able to be modified into their own custom chatbot by anyone. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. Still being created, tba.  
@@ -109,6 +71,42 @@ Selection; Menu Options = 1-2, Exit Program = X:
 
 ### Notation
 - Current, testing and advised, model(s): `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF`.
+
+### Development
+The current plan for work is...
+1. Optimize for Less Overall Characters, more advanced programming. 
+2. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script(s).
+2. Test and Bugfix, all options and features, soes everything still works.
+5. work on expansion of features, this will require a list of wanted features, then break down to, least code and best advantage, to round off features.
+
+### File Structure
+- Initial File Structure...
+```
+./
+├── Chat-Ubuntu-Gguf.sh        # Main Bash launcher script
+├── main_script.py             # Entry point script
+├── requirements.txt           # Dependencies for the virtual environment
+├── prompts/
+│   ├── consolidate.txt        # Prompt template for consolidation tasks
+│   ├── converse.txt           # Prompt template for conversation tasks
+├── scripts/
+│   ├── interface.py           # Gradio interface logic
+│   ├── model.py               # GGUF model handling and interaction
+│   ├── utility.py             # Utility functions
+└── LICENSE.txt                # License file for the project
+```
+- Files Created by Installation...
+```
+./
+├── data/
+│   ├── temporary.py           # Holds ALL global variables
+│   ├── __init__.py            # to mark the directory as a Python package
+│   ├── persistent.yaml        # Holds default Chatbot configuration
+├── venv/                      # Venv local install folder avoiding system conflict.
+│   ├── *                      # Various libraries installed from `./requirements.txt`.
+├── logs/                      # (Empty) Will contain any produced log files.
+├── models/                    # (Empty) Directory for, `*.GGUF` and `model_config.json` ,files
+```
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
