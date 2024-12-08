@@ -54,12 +54,15 @@ Selection; Menu Options = 1-2, Exit Program = X:
 - Python - Python is installed to `./VENV` does not affect system.
 - LLMs - GGUF format Large Language Models, it will detect parameters.
 - CPU - Tested on AMD x3900 CPU, llama-cpp-python supports others.
+- Internet - Libraries and Compile stuff, will install from web.  
 
 ### Usage
+Instructions are for upcoming GPU enhanced version...
 1. Download the release, and then unpack to a sensible folder somewhere, then open a terminal in that folder.
 1. In the terminal run the command "sudo ./Chat-Ubuntu-Gguf.sh" in terminal in the program folder.
 2. the Installer/Launcher runs, and you should select `2` to, install requirements and setup files/folders.
-3. You should then insert your `*.gguf` to the newly created folder `./models` (it will auto-detect settings).
+3. A menu with options will appear for your GPU, this will compile llama-cpp optimally for your OS/GPU.
+3. After install completes, insert your `*.gguf` to the newly created folder `./models` (settings auto-detect).
 4. You should then select `1` from the menu to launch the main program, and a browser window should pop-up, but in failing that then right click on `http://127.0.0.1:7860` and then left click `Open Link` to do the same.
 5. You will then be interacting with the browser interface, where the buttons do what you would expect, but ensure to take a quick look at the "Configuration" tab first.
 6. After finishing your session, then click on `Exit Program` in the browser window, and then the terminal will return to the Bash menu, and then select `X` to exit correctly. 
