@@ -66,9 +66,9 @@ Selection; Menu Options = 1-2, Exit Program = X:
 
 ### Example Prompts
 1) "Hello there! I never thought I would see you here on the mountain..."
-2) "Wow, you can actually talk? What's your story?"
-3) "You look wise, do you have any ancient wisdom to share?"
-4) "Tell me, Wise-Llama, what is the purpose of humanity?"
+2) "Wow, I bet you can actually talk? A talking llama, I'll be rich!"
+3) "You look knowledgeable, do you have wise thoughts and think wise things?"
+4) "Tell me, Wise-Llama, what is humanity's purpose, and dont tell me 42!"
 
 ### Notation
 - Current, testing and advised, model(s): `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF`.
