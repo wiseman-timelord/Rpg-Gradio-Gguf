@@ -1,5 +1,4 @@
 # Chat-Ubuntu-Gguf
-(currently updating, wait for full release)
 - Status: Working
 
 ### Description
