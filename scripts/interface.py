@@ -16,13 +16,20 @@ def shutdown():
 
 def reset_session():
     """
-    Resets the session history and related variables to default values in data.temporary.
-    Does NOT save to persistent.yaml automatically. Keeps it ephemeral.
+    Resets session history and related variables to their default values in data.temporary.
     """
-    reset_session_state()  # Resets session_history, agent_output, human_input in data.temporary
+    # Reload `session_history` default from persistent.yaml
+    persistent_data = read_yaml('./data/persistent.yaml')
+    default_history = persistent_data.get('session_history', "The conversation started")
+
+    # Reset variables
+    temporary.agent_output = ""
+    temporary.session_history = default_history
     temporary.rotation_counter = 0
-    # Return updated interface fields without writing to YAML
-    return "", temporary.session_history
+
+    # Return the updated values for the UI
+    return "", default_history
+
 
 def apply_configuration(new_agent_name, new_agent_role, new_human_name):
     temporary.agent_name = new_agent_name
@@ -33,7 +40,6 @@ def apply_configuration(new_agent_name, new_agent_role, new_human_name):
 def save_configuration(new_agent_name, new_agent_role, new_human_name, new_threads_percent, new_session_history):
     """
     Saves agent configuration and session settings to persistent.yaml.
-    This is explicitly triggered by the user.
     """
     temporary.agent_name = new_agent_name
     temporary.agent_role = new_agent_role
@@ -41,40 +47,46 @@ def save_configuration(new_agent_name, new_agent_role, new_human_name, new_threa
     temporary.threads_percent = int(new_threads_percent)
     temporary.session_history = new_session_history
 
-    # Now actually save to persistent.yaml
-    from main_script import save_persistent_settings
-    save_persistent_settings()
+    # Save updated values to YAML
+    data_to_save = {
+        'agent_name': new_agent_name,
+        'agent_role': new_agent_role,
+        'human_name': new_human_name,
+        'threads_percent': int(new_threads_percent),
+        'session_history': new_session_history
+    }
+    write_to_yaml('./data/persistent.yaml', data_to_save)
+
     return "Configuration and session settings saved successfully!"
+
 
 def chat_with_model(user_input):
     """
     Handles the chat interaction: sends user input to the model and processes responses.
     """
     if not user_input.strip():
-        return "Error: Input cannot be empty.", temporary.session_history
+        return "Error: Input cannot be empty.", ""
 
     # Update the human_input variable
     temporary.human_input = user_input.strip()
-    print(f"[DEBUG] Updated human_input: {temporary.human_input}")  # Debugging line
 
-    temporary.rotation_counter += 1
-
-    # First, get the response from 'converse'
+    # Process 'converse' prompt
     converse_result = prompt_response('converse', temporary.rotation_counter)
     if 'error' in converse_result:
-        return f"Error in model response: {converse_result['error']}", temporary.session_history
+        return f"Error in model response: {converse_result['error']}", ""
 
+    # Update `agent_output` with only the latest response
     temporary.agent_output = converse_result['agent_response']
-    # Update session history with both input and output
-    temporary.session_history += f"\n{temporary.human_input}\n{temporary.agent_output}"
-    print(f"[DEBUG] Updated session history after converse:\n{temporary.session_history}")
 
-    # Now call the 'consolidate' prompt
+    # Process 'consolidate' prompt
     consolidate_result = prompt_response('consolidate', temporary.rotation_counter)
     if 'error' in consolidate_result:
-        return f"Error in model consolidation: {consolidate_result['error']}", temporary.session_history
+        return temporary.agent_output, f"Error in model consolidation: {consolidate_result['error']}"
 
-    # The 'consolidate' response is already appended to session_history in `prompt_response`
+    # Update `session_history` with only the latest response from 'consolidate'
+    temporary.session_history = consolidate_result['agent_response']
+
+    # Return results for UI update
     return temporary.agent_output, temporary.session_history
 
 
@@ -90,6 +102,13 @@ def launch_gradio_interface():
                 gr.Markdown("# Chat-Ubuntu-Gguf")
 
                 with gr.Row():
+                    with gr.Column(scale=1):
+                        session_history_display = gr.Textbox(
+                            label="Conversation History",
+                            lines=15,
+                            value=session_history_current,
+                            interactive=False
+                        )
                     with gr.Column(scale=3):
                         bot_response = gr.Textbox(
                             label="AI Response",
@@ -103,13 +122,7 @@ def launch_gradio_interface():
                             placeholder="Type your message here...",
                             interactive=True
                         )
-                    with gr.Column(scale=1):
-                        session_history_display = gr.Textbox(
-                            label="Conversation History",
-                            lines=15,
-                            value=session_history_current,
-                            interactive=False
-                        )
+
 
                 with gr.Row():
                     send_btn = gr.Button("Send Message")
