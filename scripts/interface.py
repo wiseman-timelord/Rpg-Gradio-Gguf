@@ -95,6 +95,11 @@ def launch_gradio_interface():
     # if already handled in the background engine or initialization flow
     session_history_current = temporary.session_history
 
+    # Use dynamic labels based on `agent_name` and `human_name`
+    agent_output_label = f"{temporary.agent_name}'s Output (AI)"
+    human_input_label = f"{temporary.human_name}'s Input (You)"
+    session_history_label = "Consolidated History"
+
     with gr.Blocks() as interface:
         with gr.Tabs():
             # Conversation Tab
@@ -102,27 +107,26 @@ def launch_gradio_interface():
                 gr.Markdown("# Chat-Ubuntu-Gguf")
 
                 with gr.Row():
-                    with gr.Column(scale=1):
-                        session_history_display = gr.Textbox(
-                            label="Conversation History",
-                            lines=15,
-                            value=session_history_current,
-                            interactive=False
-                        )
                     with gr.Column(scale=3):
                         bot_response = gr.Textbox(
-                            label="AI Response",
+                            label=agent_output_label,
                             lines=10,
                             value="",
                             interactive=False
                         )
                         user_input = gr.Textbox(
-                            label="Your Input",
+                            label=human_input_label,
                             lines=2,
                             placeholder="Type your message here...",
                             interactive=True
                         )
-
+                    with gr.Column(scale=1):
+                        session_history_display = gr.Textbox(
+                            label=session_history_label,
+                            lines=15,
+                            value=session_history_current,
+                            interactive=False
+                        )
 
                 with gr.Row():
                     send_btn = gr.Button("Send Message")
