@@ -75,6 +75,7 @@ Selection; Menu Options = 1-2, Exit Program = X:
 
 ### Development
 The current plan for work is...
+1. GPU Selection in Bash, then install appropriate libraries, and then in main program, configuration and use, of GPU and/or CPU, depending upon the assigment of Layers in the configuration.
 1. Optimize for Less Overall Characters, more advanced programming. 
 2. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script(s).
 2. Test and Bugfix, all options and features, soes everything still works.
