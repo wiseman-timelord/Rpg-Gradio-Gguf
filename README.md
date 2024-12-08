@@ -64,8 +64,10 @@ Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate
 - The Bash Installer/Launcher - under development...
 ```
 ================================================================================
-    Chat-Ubuntu-Gguf
+    Chat-Ubuntu-Gguf - Bash Menu
 ================================================================================
+
+
 
 
 
@@ -77,8 +79,12 @@ Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate
 
 
 
+
+
+
 --------------------------------------------------------------------------------
 Selection; Menu Options = 1-2, Exit Program = X: 
+
 ```
 
 ### Requirements
