@@ -56,11 +56,12 @@ Selection; Menu Options = 1-2, Exit Program = X:
 - AMD - Created and Tested on AMD CPU, not testing on other hardware.
 
 ### Usage
-1. When it works, it will run through "sudo ./Chat-Ubuntu-Gguf.sh" in terminal in the program folder.
+1. Download the release, and then unpack to a sensible folder somewhere, then open a terminal in that folder.
+1. In the terminal run the command "sudo ./Chat-Ubuntu-Gguf.sh" in terminal in the program folder.
 2. the Installer/Launcher runs, and you should select `2` to, install requirements and setup files/folders.
-3. You should then insert your `*.gguf` to the `./models` folder that was created, it will later auto-detect settings.
-4. You should then select `1` from the menu to run the main program, and a browser window should pop-up, but in failing that then right click on `http://127.0.0.1:7860` in the terminal and go to `Open Link` to do the same.
-5. You will then be interacting with the browser interface, where the buttons do what you would expect, and most desired options are available.
+3. You should then insert your `*.gguf` to the newly created folder `./models` (it will auto-detect settings).
+4. You should then select `1` from the menu to launch the main program, and a browser window should pop-up, but in failing that then right click on `http://127.0.0.1:7860` and then left click `Open Link` to do the same.
+5. You will then be interacting with the browser interface, where the buttons do what you would expect, but ensure to take a quick look at the "Configuration" tab first.
 6. After finishing your session, then click on `Exit Program` in the browser window, and then the terminal will return to the Bash menu, and then select `X` to exit correctly. 
 
 ### Example Prompts
