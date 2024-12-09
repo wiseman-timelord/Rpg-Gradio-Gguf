@@ -1,8 +1,8 @@
-# Chat-Ubuntu-Gguf
+# Chat-Linux-Gguf
 - Status: Working
 
 ### Description
-Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. Still being created, tba. In v1.00, there was, 4 Python and 1 Bash, scripts, enabling editing with the maximum of 5 files (excluding prompts) upload in claude_sonnet for free account, thus, able to be modified in AI with files by anyone; progressing past v1.00, more complexity is added, so less focus on limiting script numbers, in an attempt to avoid, complexity and code loss.
+Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. Still being created, tba. In v1.00, there was, 4 Python and 1 Bash, scripts, enabling editing with the maximum of 5 files (excluding prompts) upload in claude_sonnet for free account, thus, able to be modified in AI with files by anyone; progressing past v1.00, more complexity is added, so less focus on limiting script numbers, in an attempt to avoid, complexity and code loss.
 
 ### FEATURES
 - Gguf Models: Using, Gguf-Parser and accompanying json files; auto-configuration of model parameters. 
@@ -12,7 +12,6 @@ Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate
 - 2 Prompt rotation for, conversation and consolidation, producing context aware conversation.
 - Modularity: Python scripts are designed to work together with clear roles (e.g., model handling, interface logic).
 - Persistence: Session data, settings, and configurations are retained across restarts.
-- Optimized for Ubuntu: Specifically tailored to Ubuntu 24.04–24.10 and AMD architecture.
 
 ### Preview
 - The Conversation Page...
@@ -59,7 +58,7 @@ Selection; Menu Options = 1-2, Exit Program = X:
 ### Usage
 Instructions are for upcoming GPU enhanced version...
 1. Download the release, and then unpack to a sensible folder somewhere, then open a terminal in that folder.
-1. In the terminal run the command "sudo ./Chat-Ubuntu-Gguf.sh" in terminal in the program folder.
+1. In the terminal run the command "sudo ./Chat-Linux-Gguf.sh" in terminal in the program folder.
 2. the Installer/Launcher runs, and you should select `2` to, install requirements and setup files/folders.
 3. If you've multiple, GPUs and brands, a GPU menu will appear, select the GPU brand you intend to use.
 3. After install completes, insert your `*.gguf` to the newly created folder `./models` (settings auto-detect).
@@ -88,7 +87,7 @@ The current plan for work is...
 - Initial File Structure...
 ```
 ./
-├── Chat-Ubuntu-Gguf.sh        # Main Bash launcher script
+├── Chat-Linux-Gguf.sh        # Main Bash launcher script
 ├── main_script.py             # Entry point script
 ├── requirements.txt           # Dependencies for the virtual environment
 ├── prompts/
