@@ -2,7 +2,7 @@
 - Status: Working
 
 ### Description
-Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. There is, 1 py script in `./` and 3 py scripts in `./scripts` and 1 sh script in `./`, enabling editing with the maximum of 5 files upload in claude_sonnet for free account, thus, able to be modified in AI with files by anyone. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. Still being created, tba.  
+Its a lightweight Chatbot native to Ubuntu 24, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. Still being created, tba. In v1.00, there was, 4 Python and 1 Bash, scripts, enabling editing with the maximum of 5 files (excluding prompts) upload in claude_sonnet for free account, thus, able to be modified in AI with files by anyone; progressing past v1.00, complexity is added, and so less focus on limiting script numbers in an attempt to avoid, complexity and code loss.
 
 ### FEATURES
 - Gguf Models: Using, Gguf-Parser and accompanying json files; auto-configuration of model parameters. 
