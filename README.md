@@ -1,4 +1,4 @@
-# Chat-Linux-Gguf
+# Chat-Linux-Gguf (was Chat-Ubuntu-Gguf)
 - Status: Working
 
 ### Description
