@@ -1,6 +1,6 @@
 # Chat-Linux-Gguf (was Chat-Ubuntu-Gguf)
-- Status: Working, still early development.
-- Note: Readme is being updated, GPU features differ from release.
+- Status: Working, still early development, but v1.00 works great on CPU.
+- Note: Readme/Program is being updated, GPU features not present in release.
 
 ### Description
 Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. Still being created, tba. In v1.00, there was, 4 Python and 1 Bash, scripts, enabling editing with the maximum of 5 files (excluding prompts) upload in claude_sonnet for free account, thus, able to be modified in AI with files by anyone; progressing past v1.00, more complexity is added, so less focus on limiting script numbers, in an attempt to avoid, complexity and code loss.
