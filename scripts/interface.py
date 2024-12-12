@@ -11,26 +11,27 @@ import threading
 import time
 
 def shutdown():
-    print("Shutting down the appliion...")
+    print("Shutting down the application...")
     os.kill(os.getpid(), signal.SIGTERM)
 
 def reset_session():
     """
-    Resets session history and related variables to their default values in data.temporary.
+    Soft reset of session variables
     """
-    # Reload `session_history` default from persistent.yaml
-    persistent_data = read_yaml('./data/persistent.yaml')
-    default_history = persistent_data.get('session_history', "The conversation started")
+    # Read the latest configuration from YAML
+    read_config = read_yaml('./data/persistent.yaml')
+    
+    # Reset temporary variables to the values from the configuration
+    temporary.agent_name = read_config.get('agent_name', 'Wise-Llama')
+    temporary.agent_role = read_config.get('agent_role', 'A wise oracle of sorts')
+    temporary.human_name = read_config.get('human_name', 'Human')
+    temporary.session_history = read_config.get('session_history', "the conversation started")
+    
+    # Reset session-specific variables
+    reset_session_state()
 
-    # Reset variables
-    temporary.agent_output = ""
-    temporary.session_history = default_history
-    temporary.rotation_counter = 0
-
-    # Return the updated values for the UI
-    return "", default_history
-
-
+    # Return the updated values to reflect in UI inputs
+    return temporary.session_history, "", ""
 
 def apply_configuration(new_agent_name, new_agent_role, new_human_name):
     temporary.agent_name = new_agent_name
@@ -39,7 +40,6 @@ def apply_configuration(new_agent_name, new_agent_role, new_human_name):
 
     # Return the updated values to reflect in UI inputs
     return new_agent_name, new_agent_role, new_human_name
-
 
 def update_keys(new_agent_name, new_agent_role, new_human_name, new_threads_percent, new_session_history):
     """
@@ -64,6 +64,17 @@ def update_keys(new_agent_name, new_agent_role, new_human_name, new_threads_perc
 
     return "Settings updated successfully!"
 
+def filter_model_output(raw_output):
+    """
+    Filters the model output to extract the response after the first colon in the first 25 characters.
+    """
+    if ":" in raw_output[:25]:
+        # Extract the text after the first colon
+        response = raw_output.split(":", 1)[1].strip()
+        return f"{temporary.agent_name}: {response}"
+    else:
+        return raw_output
+
 def chat_with_model(user_input):
     """
     Handles the chat interaction: sends user input to the model and processes responses.
@@ -72,15 +83,18 @@ def chat_with_model(user_input):
         return "Error: Input cannot be empty.", ""
 
     # Update the human_input variable
-    temporary.human_input = user_input.strip()
+    temporary.human_input = f"{temporary.human_name}: {user_input.strip()}"
 
     # Process 'converse' prompt
     converse_result = prompt_response('converse', temporary.rotation_counter)
     if 'error' in converse_result:
         return f"Error in model response: {converse_result['error']}", ""
 
-    # Update `agent_output` with only the latest response
-    temporary.agent_output = converse_result['agent_response']
+    # Filter the model's response
+    filtered_response = filter_model_output(converse_result['agent_response'])
+
+    # Update `agent_output` with the filtered response
+    temporary.agent_output = filtered_response
 
     # Process 'consolidate' prompt
     consolidate_result = prompt_response('consolidate', temporary.rotation_counter)
@@ -93,82 +107,43 @@ def chat_with_model(user_input):
     # Return results for UI update
     return temporary.agent_output, temporary.session_history
 
-
-
 def launch_gradio_interface():
-    # Ensure data is re-synced with the latest settings
-    session_history_current = temporary.session_history
-
-    # Use dynamic labels based on `agent_name` and `human_name`
-    def get_labels():
-        return (
-            f"{temporary.agent_name}'s Output (AI)",
-            f"{temporary.human_name}'s Input (You)"
-        )
-
-    # Refresh the conversation tab components
-    def refresh_conversation():
-        agent_output_label, human_input_label = get_labels()
-        return agent_output_label, human_input_label
-
     with gr.Blocks() as interface:
-        with gr.Tabs() as tabs:
-            # Conversation Tab
+        with gr.Tabs():
             with gr.Tab("Conversation"):
-                gr.Markdown("# Chat-Ubuntu-Gguf")
-
-                # Initial dynamic labels
-                agent_output_label, human_input_label = get_labels()
-
+                gr.Markdown("# Chat Interface")
+                
+                # Main layout
                 with gr.Row():
-                    with gr.Column(scale=3):
-                        bot_response = gr.Textbox(
-                            label=agent_output_label,
-                            lines=10,
-                            value="",
-                            interactive=False
-                        )
-                        user_input = gr.Textbox(
-                            label=human_input_label,
-                            lines=2,
-                            placeholder="Type your message here...",
-                            interactive=True
-                        )
-                    with gr.Column(scale=1):
-                        session_history_display = gr.Textbox(
-                            label="Consolidated History",
-                            lines=15,
-                            value=session_history_current,
-                            interactive=False
-                        )
-
+                    with gr.Column(scale=1):  # Equal size for both columns
+                        bot_response = gr.Textbox(label="Agent Output:", lines=10, value="", interactive=False)
+                        user_input = gr.Textbox(label="User Input:", lines=10, placeholder="Type your message here...", interactive=True)
+                    with gr.Column(scale=1):  # Equal size for both columns
+                        session_history_display = gr.Textbox(label="Consolidated History", lines=20, value=temporary.session_history, interactive=False)
+                
+                # Buttons row
                 with gr.Row():
                     send_btn = gr.Button("Send Message")
-                    reset_btn = gr.Button("Reset Session")
+                    reset_btn = gr.Button("Restart Session")
                     exit_btn = gr.Button("Exit Program")
 
+                # Define button actions
                 send_btn.click(
-                    fn=chat_with_model,
-                    inputs=user_input,
+                    fn=chat_with_model, 
+                    inputs=user_input, 
                     outputs=[bot_response, session_history_display]
                 )
+                
                 reset_btn.click(
                     fn=reset_session,
                     inputs=[],
-                    outputs=[bot_response, session_history_display]
-                )
-                exit_btn.click(
-                    fn=shutdown,
-                    inputs=[],
-                    outputs=[]
+                    outputs=[session_history_display, bot_response, user_input]
                 )
 
-                # Add a placeholder to refresh the labels dynamically
-                label_refresh_btn = gr.Button(visible=False)
-                label_refresh_btn.click(
-                    fn=refresh_conversation,
-                    inputs=[],
-                    outputs=[bot_response, user_input]
+                exit_btn.click(
+                    fn=shutdown, 
+                    inputs=[], 
+                    outputs=[]
                 )
 
             # Configuration Tab
