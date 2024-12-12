@@ -5,6 +5,9 @@
 ### Description
 Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. Still being created, tba. In v1.00, there was, 4 Python and 1 Bash, scripts, enabling editing with the maximum of 5 files (excluding prompts) upload in claude_sonnet for free account, thus, able to be modified in AI with files by anyone; progressing past v1.00, more complexity is added, so less focus on limiting script numbers, in an attempt to avoid, complexity and code loss.
 
+### Note
+- It has been discovered that v1.00 has fatal flaw of `It does not dynamically display the user/AI name.`, other than that it works, and this will be fixed for the next update (CUDA on Unified Memory).
+
 ### FEATURES
 - Gguf Models: Using, Gguf-Parser and accompanying json files; auto-configuration of model parameters. 
 - Gradio Interface: A browser-based interactive interface tied seamlessly into terminal operations.
