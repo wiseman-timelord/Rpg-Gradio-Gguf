@@ -80,7 +80,8 @@ Instructions are for upcoming GPU enhanced version...
 The current plan for work is...
 - Delays with GPT not working well, and now is unnavailable, possibly related... 
 1. It does not dynamically display the user's name, this would be a fatal flaw.
-1. installer issues with earlier working features, not detecing features of GPU correctly, re-investigating test scripts. 
+1. installer works apart from issues with earlier working features, now not detecing features of GPU correctly, re-investigating test scripts. 
+3. GPU in py scripts needs conversion to new nvidia unified memory implementation, cuda cores on system memory.
 1. Optimize for Less Overall Characters, more advanced programming. 
 2. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script(s).
 2. Test and Bugfix, all options and features, soes everything still works.
