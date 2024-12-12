@@ -57,12 +57,12 @@ Selection; Menu Options = 1-2, Exit Program = X:
 - Python - Python is installed to `./VENV` does not affect system.
 - LLMs - GGUF format Large Language Models, it will detect parameters.
 - CPU (<=v1.01) - Any x64 Cpu, scripts use standard llama-cpp-python. 
-- GPU (=>v1.02) - nVidia CUDA Only, See notes for reasoning.
+- GPU (=>v1.0? Upcoming) - nVidia CUDA Only, See notes for reasoning.
 - Internet - Libraries and Compile stuff, bash installs from web.  
 
 ### Usage
 Instructions are for upcoming GPU enhanced version...
-1. Download the release, and then unpack to a sensible folder somewhere, then open a terminal in that folder, make "./Chat-Linux-Gguf.sh" executable.
+1. Download the release version suted to your hardware, and then unpack to a sensible folder somewhere, then open a terminal in that folder, make "./Chat-Linux-Gguf.sh" executable.
 1. In the terminal run the command "sudo ./Chat-Linux-Gguf.sh" in terminal in the program folder, and ensure the files are executable if there is immediate issue.
 2. the Installer/Launcher runs, and you should select `2` to, install requirements and setup files/folders.
 3. If you've multiple, GPUs and brands, a GPU menu will appear, select the GPU brand you intend to use.
