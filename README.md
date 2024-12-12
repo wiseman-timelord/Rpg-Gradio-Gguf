@@ -1,6 +1,6 @@
 # Chat-Linux-Gguf (was Chat-Ubuntu-Gguf)
 - Status: Working, 
-- Note: Still early development, v1.00 works great on CPU; Readme here is mixed with info on upcoming GPU features not yet present in release.
+- Note: Still early development, v1.00 works on CPU; readme here is mixed with info on upcoming GPU features not yet present in release, see `Deelopment` section for obvious issues.
 
 ### Description
 Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. Still being created, tba. In v1.00, there was, 4 Python and 1 Bash, scripts, enabling editing with the maximum of 5 files (excluding prompts) upload in claude_sonnet for free account, thus, able to be modified in AI with files by anyone; progressing past v1.00, more complexity is added, so less focus on limiting script numbers, in an attempt to avoid, complexity and code loss.
@@ -80,9 +80,8 @@ Instructions are for upcoming GPU enhanced version...
 - Current, testing and advised, model(s): `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF`.
 
 ### Development
-The current plan for work is...
-- Delays with GPT not working well, and now is unnavailable, possibly related... 
-1. It does not dynamically display the user's name, this would be a fatal flaw.
+The current plan for work featured is...
+1. It dynamically display the user and agent name based on config, but is not yet .
 1. installer works apart from issues with earlier working features, now not detecing features of GPU correctly, re-investigating test scripts. 
 3. GPU in py scripts needs conversion to new nvidia unified memory implementation, cuda cores on system memory.
 1. Optimize for Less Overall Characters, more advanced programming. 
@@ -121,6 +120,7 @@ The current plan for work is...
 
 ## NOTES:
 - "Llama.cpp has been working on improving AMD GPU support, but the implementation is not as mature as NVIDIA's CUDA support." -Claude_Sonnet
+- GPT Stopped working during development, it came back on few hours later, but delays lead to distractions for me.
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
