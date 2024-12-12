@@ -20,7 +20,7 @@ Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate con
 ### Preview
 - The Conversation Page...
 
-![preview_image](media/gradio_main.png)
+![preview_image](media/conversation.png)
 
 - The Configuration Page...
 
