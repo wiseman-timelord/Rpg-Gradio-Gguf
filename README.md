@@ -78,8 +78,9 @@ Instructions are for upcoming GPU enhanced version...
 
 ### Development
 The current plan for work is...
-1. It does not dynamically display the user's name, this would be a fatal flaw, and will be fixed as soon as the GPU code is done, still installer issues with earlier working features, not detecing features of GPU correctly. GPT has been not working well, and now is unnavailable.
-1. GPU Selection in Bash, then install appropriate libraries, and then in main program, configuration and use, of GPU and/or CPU, depending upon the assigment of Layers in the configuration.
+- Delays with GPT not working well, and now is unnavailable, possibly related... 
+1. It does not dynamically display the user's name, this would be a fatal flaw.
+1. installer issues with earlier working features, not detecing features of GPU correctly, re-investigating test scripts. 
 1. Optimize for Less Overall Characters, more advanced programming. 
 2. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script(s).
 2. Test and Bugfix, all options and features, soes everything still works.
