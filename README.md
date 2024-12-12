@@ -81,7 +81,7 @@ Instructions are for upcoming GPU enhanced version...
 
 ### Development
 The current plan for work featured is...
-1. It dynamically display the user and agent name based on config, but is not yet .
+1. Dynamic display of text on gradio display became frustrating, implementing workarounds.
 1. installer works apart from issues with earlier working features, now not detecing features of GPU correctly, re-investigating test scripts. 
 3. GPU in py scripts needs conversion to new nvidia unified memory implementation, cuda cores on system memory.
 1. Optimize for Less Overall Characters, more advanced programming. 
