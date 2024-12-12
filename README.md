@@ -82,7 +82,9 @@ Instructions are for upcoming GPU enhanced version...
 
 ### Development
 The current plan for work featured is...
-1. Create plan for re-implementation of CUDA with Unified Memory
+1. CPU threads will should be moved to gradio page labelled `Hardware`, create new page in gradio interface for `Parameters`, this will have parameters for roleplay configuration currently plresent in `Configuration` page.  
+2. new `Hardware` page should have display of `./data/hardware_details.txt`, in new non-editable text box above cpu threads % slider, installer will be required to create this during install.
+1. Create plan for re-implementation of CUDA with Unified Memory, investigate how unified memory is done.
 1. installer works apart from issues with earlier working features, now not detecing features of GPU correctly, re-investigating test scripts. 
 3. GPU in py scripts needs conversion to new nvidia unified memory implementation, cuda cores on system memory.
 1. Optimize for Less Overall Characters, more advanced programming. 
