@@ -56,7 +56,7 @@ Selection; Menu Options = 1-2, Exit Program = X:
 - Linux OS - Personally using Ubuntu 24.10, likely other Linux work.
 - Python - Python is installed to `./VENV` does not affect system.
 - LLMs - GGUF format Large Language Models, it will detect parameters.
-- GPU - CUDA/nVidia Only. AMD/Radeon does'nt expose Shaders/Memory.
+- GPU - CUDA/nVidia Only - See notes for reasoning.
 - Internet - Libraries and Compile stuff, will install from web.  
 
 ### Usage
@@ -118,6 +118,9 @@ The current plan for work is...
 ├── logs/                      # (Empty) Will contain any produced log files.
 ├── models/                    # (Empty) Directory for, `*.GGUF` and `model_config.json` ,files
 ```
+
+## NOTES:
+- "Llama.cpp has been working on improving AMD GPU support, but the implementation is not as mature as NVIDIA's CUDA support." -Claude_Sonnet
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
