@@ -21,28 +21,20 @@ def read_yaml(file_path='./data/persistent.yaml'):
         print(f"Error reading YAML: {e}")
         return {}
 
-def write_to_yaml(key, value, file_path='./data/persistent.yaml'):
+def write_to_yaml(data_to_save, file_path='./data/persistent.yaml'):
+    """
+    Writes updated data to the YAML file and validates the saved content.
+    """
     try:
-        data = read_yaml(file_path) or {}
-        if key == 'session_history' and not value.strip():
-            value = "the conversation started"
-        data[key] = value
         with open(file_path, 'w') as file:
-            yaml.safe_dump(data, file)
+            yaml.safe_dump(data_to_save, file)
+
+        # Validate if the data was saved correctly
+        saved_data = read_yaml(file_path)
+        if saved_data != data_to_save:
+            print("Warning: Saved data does not match expected values.")
     except Exception as e:
         print(f"Error writing to YAML: {e}")
-
-
-
-# Function to calculate optimal threads
-def calculate_optimal_threads(threads_percent=80):
-    """
-    Calculates the optimal number of threads to use based on the percentage provided.
-    """
-    cpu_count = os.cpu_count()
-    optimal_threads = max(1, (cpu_count * threads_percent) // 100)
-    print(f"Optimal threads based on {threads_percent}% of {cpu_count} cores: {optimal_threads}")
-    return optimal_threads
 
 # Resets session-specific variables to their default values
 def reset_session_state():
@@ -63,3 +55,13 @@ def scan_models_directory(models_dir='./models'):
                     'config_path': json_path
                 })
     return models
+
+def calculate_optimal_threads(threads_percent=80):
+    """
+    Calculates the optimal number of threads to use based on the percentage provided.
+    """
+    cpu_count = os.cpu_count()
+    optimal_threads = max(1, (cpu_count * threads_percent) // 100)
+    print(f"Optimal threads based on {threads_percent}% of {cpu_count} cores: {optimal_threads}")
+    return optimal_threads
+

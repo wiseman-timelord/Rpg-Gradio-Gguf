@@ -11,7 +11,7 @@ import threading
 import time
 
 def shutdown():
-    print("Shutting down the application...")
+    print("Shutting down the appliion...")
     os.kill(os.getpid(), signal.SIGTERM)
 
 def reset_session():
@@ -31,16 +31,21 @@ def reset_session():
     return "", default_history
 
 
+
 def apply_configuration(new_agent_name, new_agent_role, new_human_name):
     temporary.agent_name = new_agent_name
     temporary.agent_role = new_agent_role
     temporary.human_name = new_human_name
-    return "Configuration applied successfully (Not saved yet)."
 
-def save_configuration(new_agent_name, new_agent_role, new_human_name, new_threads_percent, new_session_history):
+    # Return the updated values to reflect in UI inputs
+    return new_agent_name, new_agent_role, new_human_name
+
+
+def update_keys(new_agent_name, new_agent_role, new_human_name, new_threads_percent, new_session_history):
     """
-    Saves agent configuration and session settings to persistent.yaml.
+    Updates temporary variables and saves them to persistent.yaml.
     """
+    # Update the global variables in temporary
     temporary.agent_name = new_agent_name
     temporary.agent_role = new_agent_role
     temporary.human_name = new_human_name
@@ -55,10 +60,9 @@ def save_configuration(new_agent_name, new_agent_role, new_human_name, new_threa
         'threads_percent': int(new_threads_percent),
         'session_history': new_session_history
     }
-    write_to_yaml('./data/persistent.yaml', data_to_save)
+    write_to_yaml(data_to_save, './data/persistent.yaml')
 
-    return "Configuration and session settings saved successfully!"
-
+    return "Settings updated successfully!"
 
 def chat_with_model(user_input):
     """
@@ -90,21 +94,31 @@ def chat_with_model(user_input):
     return temporary.agent_output, temporary.session_history
 
 
+
 def launch_gradio_interface():
-    # Ensure data is re-synced with the latest settings, although this might be redundant
-    # if already handled in the background engine or initialization flow
+    # Ensure data is re-synced with the latest settings
     session_history_current = temporary.session_history
 
     # Use dynamic labels based on `agent_name` and `human_name`
-    agent_output_label = f"{temporary.agent_name}'s Output (AI)"
-    human_input_label = f"{temporary.human_name}'s Input (You)"
-    session_history_label = "Consolidated History"
+    def get_labels():
+        return (
+            f"{temporary.agent_name}'s Output (AI)",
+            f"{temporary.human_name}'s Input (You)"
+        )
+
+    # Refresh the conversation tab components
+    def refresh_conversation():
+        agent_output_label, human_input_label = get_labels()
+        return agent_output_label, human_input_label
 
     with gr.Blocks() as interface:
-        with gr.Tabs():
+        with gr.Tabs() as tabs:
             # Conversation Tab
             with gr.Tab("Conversation"):
                 gr.Markdown("# Chat-Ubuntu-Gguf")
+
+                # Initial dynamic labels
+                agent_output_label, human_input_label = get_labels()
 
                 with gr.Row():
                     with gr.Column(scale=3):
@@ -122,7 +136,7 @@ def launch_gradio_interface():
                         )
                     with gr.Column(scale=1):
                         session_history_display = gr.Textbox(
-                            label=session_history_label,
+                            label="Consolidated History",
                             lines=15,
                             value=session_history_current,
                             interactive=False
@@ -149,6 +163,14 @@ def launch_gradio_interface():
                     outputs=[]
                 )
 
+                # Add a placeholder to refresh the labels dynamically
+                label_refresh_btn = gr.Button(visible=False)
+                label_refresh_btn.click(
+                    fn=refresh_conversation,
+                    inputs=[],
+                    outputs=[bot_response, user_input]
+                )
+
             # Configuration Tab
             with gr.Tab("Configuration"):
                 gr.Markdown("# Configuration Settings")
@@ -170,17 +192,30 @@ def launch_gradio_interface():
                     value=temporary.threads_percent
                 )
 
-                with gr.Row():
-                    apply_btn = gr.Button("Apply")
-                    save_btn = gr.Button("Save")
+                # Combine functionality into a single Update Keys button
+                def update_keys(new_agent_name, new_agent_role, new_human_name, new_threads_percent, new_session_history):
+                    # Update the global variables in temporary
+                    temporary.agent_name = new_agent_name
+                    temporary.agent_role = new_agent_role
+                    temporary.human_name = new_human_name
+                    temporary.threads_percent = int(new_threads_percent)
+                    temporary.session_history = new_session_history
 
-                apply_btn.click(
-                    fn=apply_configuration,
-                    inputs=[agent_name_input, agent_role_input, human_name_input],
-                    outputs=[]
-                )
-                save_btn.click(
-                    fn=save_configuration,
+                    # Save updated values to YAML
+                    data_to_save = {
+                        'agent_name': new_agent_name,
+                        'agent_role': new_agent_role,
+                        'human_name': new_human_name,
+                        'threads_percent': int(new_threads_percent),
+                        'session_history': new_session_history
+                    }
+                    write_to_yaml(data_to_save, './data/persistent.yaml')
+
+                    return "Settings updated successfully!"
+
+                update_btn = gr.Button("Update Keys")
+                update_btn.click(
+                    fn=update_keys,
                     inputs=[
                         agent_name_input,
                         agent_role_input,
@@ -192,3 +227,4 @@ def launch_gradio_interface():
                 )
 
     interface.launch(inbrowser=True)
+
