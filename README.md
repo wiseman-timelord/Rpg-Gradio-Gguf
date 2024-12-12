@@ -53,8 +53,7 @@ Selection; Menu Options = 1-2, Exit Program = X:
 - Linux OS - Personally using Ubuntu 24.10, likely other Linux work.
 - Python - Python is installed to `./VENV` does not affect system.
 - LLMs - GGUF format Large Language Models, it will detect parameters.
-- CPU - Tested on AMD x3900 CPU, llama-cpp-python supports others.
-- GPU (optional) - CUDA/nVidia Only, AMD does'nt expose Shaders/Memory.
+- GPU - CUDA/nVidia Only, AMD does'nt expose Shaders/Memory.
 - Internet - Libraries and Compile stuff, will install from web.  
 
 ### Usage
