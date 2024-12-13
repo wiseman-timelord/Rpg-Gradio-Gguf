@@ -19,9 +19,13 @@ Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate con
 
 ![preview_image](media/conversation.png)
 
-- The Configuration Page...
+- The Parameters Page...
 
-![preview_image](media/configuration.png)
+![preview_image](media/roleplaying.png)
+
+- The Hardware Page...
+
+![preview_image](media/hardware.png)
 
 - The Installer/Launcher...
 ```
