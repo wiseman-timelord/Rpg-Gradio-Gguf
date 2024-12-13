@@ -26,7 +26,7 @@ Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate con
 - The Installer/Launcher...
 ```
 ================================================================================
-    Chat-Ubuntu-Gguf - Bash Menu
+    Chat-Linux-Gguf - Bash Menu
 ================================================================================
 
 
@@ -77,19 +77,7 @@ Instructions are for upcoming GPU enhanced version...
 ### Notation
 - Current, testing and advised, model(s): `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF`.
 - "Llama.cpp has been working on improving AMD GPU support, but the implementation is not as mature as NVIDIA's CUDA support." -Claude_Sonnet
-- v1.01 was designed for, 4 Python and 1 Bash, scripts; enabling editing with max 5 files in claude_sonnet for free account, thus, able to be edited by anyone
-
-### Development
-The current plan for work featured is...
-1. Check branding in scripts.
-1. CPU threads will should be moved to gradio page labelled `Hardware`, create new page in gradio interface for `Parameters`, this will have parameters for roleplay configuration currently plresent in `Configuration` page.  
-2. new `Hardware` page should have display of `./data/hardware_details.txt`, in new non-editable text box above cpu threads % slider. installer will be required to detect cpu hardware, then create this during install. 
-1. Create plan for re-implementation of CUDA with Unified Memory, investigate how unified memory is done. installer required to install, nvidia toolkit and nvidia cuda toolkit, then detect nvidia, device name, cuda cores total, but check python cuda compile arguments to see how best make use of knowing  the number of cuda cores, we want some kind of display showing gpu details, and slider for, % cuda cores used. memory use will be unified memory, this will allow better support for running multiple models later, ie image generation. re-investigate test scripts. 
-3. GPU in py scripts needs conversion to new nvidia unified memory implementation, cuda cores on system memory.
-1. Optimize for Less Overall Characters, more advanced programming. 
-2. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script(s).
-2. Test and Bugfix, all options and features, soes everything still works.
-5. work on expansion of features, this will require a list of wanted features, then break down to, least code and best advantage, to round off features.
+- v1.01 was designed for, 4 Python and 1 Bash, scripts; enabling editing with max 5 files in claude_sonnet for free account, thus, able to be edited by anyone.
 
 ### File Structure
 - Initial File Structure...
@@ -119,6 +107,19 @@ The current plan for work featured is...
 ├── logs/                      # (Empty) Will contain any produced log files.
 ├── models/                    # (Empty) Directory for, `*.GGUF` and `model_config.json` ,files
 ```
+
+
+### Development
+The current plan for work featured is...
+1. Ensure that at some point after the creation of `./data`, then requirements.txt is created as `./data/requirements.txt` in the bash installer, and then requirements are installed from `./data/requirements.txt` to the venv.
+2. CPU threads will should be moved to gradio page labelled `Hardware`, create new page in gradio interface for `Parameters`, this will have parameters for roleplay configuration currently plresent in `Configuration` page.  
+3. new `Hardware` page should have display of `./data/hardware_details.txt`, in new non-editable text box above cpu threads % slider. installer will be required to detect cpu hardware, then create this during install. 
+1. Create plan for re-implementation of CUDA with Unified Memory, investigate how unified memory is done. installer required to install, nvidia toolkit and nvidia cuda toolkit, then detect nvidia, device name, cuda cores total, but check python cuda compile arguments to see how best make use of knowing  the number of cuda cores, we want some kind of display showing gpu details, and slider for, % cuda cores used. memory use will be unified memory, this will allow better support for running multiple models later, ie image generation. re-investigate test scripts. 
+3. GPU in py scripts needs conversion to new nvidia unified memory implementation, cuda cores on system memory.
+1. Optimize for Less Overall Characters, more advanced programming. 
+2. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script(s).
+2. Test and Bugfix, all options and features, soes everything still works.
+5. work on expansion of features, this will require a list of wanted features, then break down to, least code and best advantage, to round off features.
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
