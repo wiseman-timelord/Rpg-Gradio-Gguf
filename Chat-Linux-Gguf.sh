@@ -4,7 +4,6 @@
 PERSISTENT_FILE="./data/persistent.yaml"
 VENV_PATH="$(pwd)/venv"
 REQUIREMENTS_FILE="./data/requirements.txt"
-HARDWARE_FILE="./data/hardware_details.txt"
 
 # Function to check if running as root
 check_sudo() {
@@ -58,28 +57,6 @@ EOF
     chmod 777 "$DATA_REQUIREMENTS_FILE"
     echo "./data/requirements.txt created successfully."
 }
-
-create_hardware_details() {
-    ensure_data_directory  # Ensure the directory exists
-    local HARDWARE_FILE="./data/hardware_details.txt"
-    echo "Detecting hardware information and creating hardware_details.txt in ./data"
-
-    # Start writing simplified hardware details
-    {
-        echo -n "CPU Name : "
-        cat /proc/cpuinfo | grep -m 1 'model name' | awk -F: '{print $2}' | sed 's/^ //'
-
-        echo -n "CPU Threads Total: "
-        lscpu | grep '^CPU(s):' | awk '{print $2}'
-
-        echo -n "Total System Ram: "
-        free -h | grep 'Mem:' | awk '{print $2}'
-    } > "$HARDWARE_FILE"
-
-    chmod 777 "$HARDWARE_FILE"
-    echo "Hardware details saved successfully to ./data/hardware_details.txt."
-}
-
 
 
 # Function to create persistent.yaml
@@ -236,10 +213,6 @@ run_installer() {
 
     # Install Python libraries from ./data/requirements.txt
     install_requirements
-    sleep 1
-
-    # Create hardware details file
-    create_hardware_details
     sleep 1
 
     echo "Setup-Installer processes have been completed."
