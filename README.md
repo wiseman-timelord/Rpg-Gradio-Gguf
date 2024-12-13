@@ -115,12 +115,15 @@ Instructions are for upcoming GPU enhanced version...
 
 ### Development
 The current plan for work featured is...
-1. Create plan for re-implementation of CUDA with Unified Memory, investigate how unified memory is done. installer required to install, nvidia toolkit and nvidia cuda toolkit, then detect nvidia, device name, cuda cores total, but check python cuda compile arguments to see how best make use of knowing  the number of cuda cores, we want some kind of display showing gpu details, and slider for, % cuda cores used. memory use will be unified memory, this will allow better support for running multiple models later, ie image generation. re-investigate test scripts. 
-3. GPU in py scripts needs conversion to new nvidia unified memory implementation, cuda cores on system memory.
-1. Optimize for Less Overall Characters, more advanced programming. 
-2. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script(s).
-2. Test and Bugfix, all options and features, soes everything still works.
-5. work on expansion of features, this will require a list of wanted features, then break down to, least code and best advantage, to round off features.
+1. Create plan for re-implementation of CUDA with Unified Memory, investigate how unified memory is done. 
+- installer required to install, nvidia toolkit and nvidia cuda toolkit, then detect nvidia, `GPU Name`, `CUDA Cores Total`, `VRAM Total`. update hardware details to additionally detail the 3 new lines for the gpu.
+- llama will be required to buid towards cuda, check compile arguments, use them to best effectiveness.
+- see how best make use of knowing the number of cuda cores/vram, in the running of the main program; when using unified memory with the cuda compiled llama, what arguments are vaild? CPU Threads, Cuda Cores? whicever it is needs or both, needs to be there on hardware screen. 
+- re-investigate test scripts. 
+2. Image generation; needs to be new window on conversation page, for the current outputted picture, Prompts may need refining to ensure shorter text output, or possibly limit to the nearest end of sentence from X characters in. Would require 1 more prompt, to send the history to the image generation model.  
+3. Optimize for Less Overall Characters, more advanced programming. 
+4. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script(s).
+5. Test and Bugfix, all options and features, soes everything still works.
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
