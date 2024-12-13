@@ -1,6 +1,6 @@
 # Chat-Linux-Gguf (was Chat-Ubuntu-Gguf)
 - Status: Working, see notes
-- Note: Readme here is mixed content with ~1.02 content GPU features not yet present in v1.01 release.
+- Note: Readme here is mixed content with upcoming GPU version not yet present.
 
 ### Description
 Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. Still being created, tba. 
