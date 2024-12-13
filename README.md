@@ -121,7 +121,9 @@ The current plan for work featured is...
 5. work on expansion of features, this will require a list of wanted features, then break down to, least code and best advantage, to round off features.
 
 ### Done for next release...
-...
+1. Generates the requirements.txt, during sh install.
+2. Branding fix, now scripts reflect Chat-Linux-Gguf.
+3. Hardware Details
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
