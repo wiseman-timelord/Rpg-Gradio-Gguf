@@ -2,9 +2,6 @@
 - Status: Working, see notes
 - Note: Readme here is mixed content with upcoming GPU version not yet present.
 
-### Done for next release...
-...
-
 ### Description
 Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. 
 
@@ -122,6 +119,9 @@ The current plan for work featured is...
 2. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script(s).
 2. Test and Bugfix, all options and features, soes everything still works.
 5. work on expansion of features, this will require a list of wanted features, then break down to, least code and best advantage, to round off features.
+
+### Done for next release...
+...
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
