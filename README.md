@@ -3,7 +3,7 @@
 - Note: Readme here is mixed content with upcoming GPU version not yet present.
 
 ### Done for next release...
-1. Generates the `requirements.txt`, during sh install.
+...
 
 ### Description
 Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. 
