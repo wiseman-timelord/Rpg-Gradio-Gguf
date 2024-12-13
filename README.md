@@ -3,10 +3,7 @@
 - Note: Readme here is mixed content with upcoming GPU version not yet present.
 
 ### Description
-Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. Still being created, tba. 
-
-### Note
-- It has been discovered that v1.00 has fatal flaw of `It does not dynamically display the user/AI name.`, other than that it works, and this will be fixed for the next update (CUDA on Unified Memory).
+Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. 
 
 ### FEATURES
 - Gguf Models: Using, Gguf-Parser and accompanying json files; auto-configuration of model parameters. 
@@ -79,6 +76,8 @@ Instructions are for upcoming GPU enhanced version...
 
 ### Notation
 - Current, testing and advised, model(s): `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF`.
+- "Llama.cpp has been working on improving AMD GPU support, but the implementation is not as mature as NVIDIA's CUDA support." -Claude_Sonnet
+- v1.01 was designed for, 4 Python and 1 Bash, scripts; enabling editing with max 5 files in claude_sonnet for free account, thus, able to be edited by anyone
 
 ### Development
 The current plan for work featured is...
@@ -120,12 +119,6 @@ The current plan for work featured is...
 ├── logs/                      # (Empty) Will contain any produced log files.
 ├── models/                    # (Empty) Directory for, `*.GGUF` and `model_config.json` ,files
 ```
-
-## NOTES:
-- "Llama.cpp has been working on improving AMD GPU support, but the implementation is not as mature as NVIDIA's CUDA support." -Claude_Sonnet
-- GPT Stopped working during development, it came back on few hours later, but delays when im motivated damages progress.
-- v1.01 was designed for, 4 Python and 1 Bash, scripts; enabling editing with max 5 files in claude_sonnet for free account, thus, able to be edited by anyone
-
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
