@@ -53,7 +53,7 @@ Selection; Menu Options = 1-2, Exit Program = X:
 ```
 
 ### Requirements
-- Linux OS - Personally using Ubuntu 24.10, likely other Linux work.
+- Linux OS - Modern Linux that is Ubuntu/Debian compatible.
 - Python - Python is installed to `./VENV` does not affect system.
 - LLMs - GGUF format Large Language Models, it will detect parameters.
 - CPU (<=v1.01) - Any x64 Cpu, scripts use standard llama-cpp-python. 
