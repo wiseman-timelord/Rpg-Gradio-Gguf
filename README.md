@@ -81,7 +81,7 @@ Instructions are for upcoming GPU enhanced version...
 ### Notation
 - Current, testing and advised, model(s): `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF`.
 - "Llama.cpp has been working on improving AMD GPU support, but the implementation is not as mature as NVIDIA's CUDA support." -Claude_Sonnet
-- v1.01 was designed for, 4 Python and 1 Bash, scripts; enabling editing with max 5 files in claude_sonnet for free account, thus, able to be edited by anyone.
+- Originally designed for, 4 Python and 1 Bash, scripts; enabling editing with max 5 files in claude_sonnet for free account, thus, able to be edited by anyone.
 
 ### File Structure
 - Initial File Structure...
