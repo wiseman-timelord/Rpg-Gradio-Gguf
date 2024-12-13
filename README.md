@@ -1,4 +1,4 @@
-# Chat-Linux-Gguf (was Chat-Ubuntu-Gguf)
+# Chat-Linux-Gguf
 - Status: Working, see notes
 - Note: Readme here is mixed content with upcoming GPU version not yet present.
 
