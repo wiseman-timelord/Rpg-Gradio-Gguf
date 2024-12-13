@@ -8,7 +8,7 @@ Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate con
 ### FEATURES
 - Gguf Models: Using, Gguf-Parser and accompanying json files; auto-configuration of model parameters. 
 - Gradio Interface: A browser-based interactive interface tied seamlessly into terminal operations.
-- Integrated Setup and Operation: Through a single Bash launcher script that manages installation, execution, and cleanup.
+- Integrated Setup and Operation: Through a single Bash launcher script that manages installation, execution, shutdown.
 - Folder and File Management: Automated handling of configuration files, logs, and persistent data (YAML-based).
 - 2 Prompt rotation for, conversation and consolidation, producing context aware conversation.
 - Modularity: Python scripts are designed to work together with clear roles (e.g., model handling, interface logic).
