@@ -112,7 +112,7 @@ Instructions are for upcoming GPU enhanced version...
 ├── models/                    # (Empty) Directory for, `*.GGUF` and `model_config.json` ,files
 ```
 
-
+ 
 ### Development
 The current plan for work featured is...
 1. Create plan for re-implementation of CUDA with Unified Memory, investigate how unified memory is done. 
