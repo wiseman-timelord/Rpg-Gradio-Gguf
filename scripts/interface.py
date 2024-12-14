@@ -19,6 +19,8 @@ def reset_session():
     temporary.agent_role = read_config.get('agent_role', 'A wise oracle of sorts')
     temporary.human_name = read_config.get('human_name', 'Human')
     temporary.session_history = read_config.get('session_history', "the conversation started")
+    temporary.selected_steps = read_config.get('selected_steps', temporary.selected_steps)
+    temporary.selected_sample_method = read_config.get('selected_sample_method', temporary.selected_sample_method)
 
     reset_session_state()
     # Return updated UI states, including the default image
@@ -34,7 +36,7 @@ def apply_configuration(new_agent_name, new_agent_role, new_human_name):
     return new_agent_name, new_agent_role, new_human_name
 
 
-def update_keys(new_threads_percent=None, new_agent_name=None, new_agent_role=None, new_human_name=None, new_session_history=None, new_image_size=None):
+def update_keys(new_threads_percent=None, new_agent_name=None, new_agent_role=None, new_human_name=None, new_session_history=None, new_image_size=None, new_steps_used=None, new_sample_method=None):
     if new_threads_percent is not None:
         temporary.threads_percent = int(new_threads_percent)
     if new_agent_name is not None:
@@ -47,16 +49,24 @@ def update_keys(new_threads_percent=None, new_agent_name=None, new_agent_role=No
         temporary.session_history = new_session_history
     if new_image_size is not None:
         temporary.IMAGE_SIZE_OPTIONS['selected_size'] = new_image_size  # Store as string
+    if new_steps_used is not None:
+        temporary.selected_steps = int(new_steps_used)  # Store as integer
+    if new_sample_method is not None:
+        temporary.selected_sample_method = new_sample_method  # Store as string
 
     data_to_save = {
         'agent_name': temporary.agent_name,
         'agent_role': temporary.agent_role,
         'human_name': temporary.human_name,
         'threads_percent': temporary.threads_percent,
-        'session_history': temporary.session_history
+        'session_history': temporary.session_history,
+        'selected_steps': temporary.selected_steps,
+        'selected_sample_method': temporary.selected_sample_method
     }
     write_to_yaml(data_to_save, './data/persistent.yaml')
     return "Settings updated successfully!"
+
+
 
 def filter_model_output(raw_output):
     if ":" in raw_output[:25]:
@@ -140,8 +150,24 @@ def launch_gradio_interface():
 
                     with gr.Column():
                         gr.Markdown("### Image Generation Settings")
-                        image_size_dropdown = gr.Dropdown(label="Image Size", choices=temporary.IMAGE_SIZE_OPTIONS['available_sizes'], value=temporary.IMAGE_SIZE_OPTIONS['selected_size'], type="value")
-                        steps_dropdown = gr.Dropdown(label="Steps Used", choices=temporary.STEPS_OPTIONS, value=temporary.selected_steps, type="value")
+                        image_size_dropdown = gr.Dropdown(
+                            label="Image Size",
+                            choices=temporary.IMAGE_SIZE_OPTIONS['available_sizes'],
+                            value=temporary.IMAGE_SIZE_OPTIONS['selected_size'],
+                            type="value"
+                        )
+                        steps_dropdown = gr.Dropdown(
+                            label="Steps Used",
+                            choices=temporary.STEPS_OPTIONS,
+                            value=temporary.selected_steps,
+                            type="value"
+                        )
+                        sample_method_dropdown = gr.Dropdown(
+                            label="Sample Method",
+                            choices=[method[0] for method in temporary.SAMPLE_METHOD_OPTIONS],  # List of labels
+                            value=temporary.selected_sample_method,    # String value
+                            type="value"
+                        )
                         gr.Markdown("### Hardware Settings")
                         hardware_details_display = gr.Textbox(
                             label="Detected Hardware Details",
@@ -163,14 +189,15 @@ def launch_gradio_interface():
 
                 # Define Save Configuration button action
                 save_configuration_btn.click(
-                    fn=lambda new_agent_name, new_agent_role, new_human_name, new_session_history, new_threads_percent, new_image_size, new_steps_used: update_keys(
+                    fn=lambda new_agent_name, new_agent_role, new_human_name, new_session_history, new_threads_percent, new_image_size, new_steps_used, new_sample_method: update_keys(
                         new_agent_name=new_agent_name,
                         new_agent_role=new_agent_role,
                         new_human_name=new_human_name,
                         new_session_history=new_session_history,
                         new_threads_percent=new_threads_percent,
                         new_image_size=new_image_size,
-                        new_steps_used=new_steps_used
+                        new_steps_used=new_steps_used,
+                        new_sample_method=new_sample_method
                     ),
                     inputs=[
                         agent_name_input,
@@ -179,7 +206,8 @@ def launch_gradio_interface():
                         session_history_input,
                         threads_slider,
                         image_size_dropdown,
-                        steps_dropdown
+                        steps_dropdown,
+                        sample_method_dropdown
                     ],
                     outputs=[]
                 )

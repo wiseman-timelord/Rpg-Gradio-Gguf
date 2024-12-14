@@ -221,6 +221,9 @@ def generate_image_from_history(session_history_prompt):
         print(f"Invalid number of steps selected: {selected_steps}. Defaulting to 2 steps.")
         selected_steps = 2
 
+    # Retrieve the selected sample method from temporary.py
+    selected_sample_method = temporary.selected_sample_method  # string
+
     # Construct a suitable prompt from session history
     # For example, we use the last line of the session_history as the image prompt
     prompt = session_history_prompt.strip().split('\n')[-1]
@@ -231,14 +234,19 @@ def generate_image_from_history(session_history_prompt):
     if not prompt:
         prompt = "A generic illustrative scene."
 
-    print(f"Generating image with prompt: '{prompt}', size: {width}x{height}, steps: {selected_steps}")
+    print(f"Generating image with prompt: '{prompt}', size: {width}x{height}, steps: {selected_steps}, sample_method: {selected_sample_method}")
+
     try:
         output_images = temporary.stable_diffusion_model.txt_to_img(
             prompt=prompt,
-            width=width,         # Set width based on selected size
-            height=height,       # Set height based on selected size
-            steps=selected_steps # Set steps based on user selection
+            width=width,                     # Set width based on selected size
+            height=height,                   # Set height based on selected size
+            sample_steps=selected_steps,     # Set steps based on user selection
+            sample_method=selected_sample_method  # Set sample method as string
         )
+    except TypeError as te:
+        print(f"TypeError during image generation: {te}")
+        return None
     except Exception as e:
         print(f"Error during image generation: {e}")
         return None
