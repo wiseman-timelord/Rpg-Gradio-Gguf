@@ -10,7 +10,7 @@ Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate con
 - Gradio Interface: A browser-based interactive interface tied seamlessly into terminal operations.
 - Integrated Setup and Operation: Through a single Bash launcher script that manages installation, execution, shutdown.
 - Folder and File Management: Automated handling of configuration files, logs, and persistent data (YAML-based).
-- 2 Prompt rotation for, conversation and consolidation, producing context aware conversation.
+- 3 Prompt rotation for, conversation and consolidation and image generation, producing context aware experience.
 - Modularity: Python scripts are designed to work together with clear roles (e.g., model handling, interface logic).
 - Persistence: Session data, settings, and configurations are retained across restarts.
 
@@ -54,15 +54,16 @@ Selection; Menu Options = 1-2, Exit Program = X:
 - Python - Python is installed to `./VENV` does not affect system.
 - LLMs - Advised models, SDXL-Lightning and Llama3.1, in Gguf. 
 - CPU (v1.00-v1.02) - Any x64 Cpu, scripts use standard llama-cpp-python. 
-- GPU (=>v1.0? Upcoming) - nVidia CUDA Only, See notes for reasoning.
+- GPU (=>v1.04 Upcoming) - nVidia CUDA Only, See notes for reasoning.
 - Internet - Libraries and Compile stuff, bash installs from web.  
 
 ### Usage
 Instructions are for upcoming GPU enhanced version...
 1. Download the release version suted to your hardware, and then unpack to a sensible folder somewhere, then open a terminal in that folder, make "./Chat-Linux-Gguf.sh" executable.
-1. In the terminal run the command "sudo ./Chat-Linux-Gguf.sh" in terminal in the program folder, and ensure the files are executable if there is immediate issue.
-2. the Installer/Launcher runs, and you should select `2` to, install requirements and setup files/folders.
-3. If you've multiple, GPUs and brands, a GPU menu will appear, select the GPU brand you intend to use.
+1. Ensure the files are executable by right clicking them and ticking the appropriate box, or alternatively running `sudo chmod -x Chat-Ununtu-Gguf.sh`.
+2. In the terminal run the command "sudo ./Chat-Linux-Gguf.sh", its a installer/launcher, libraries install to `./venv`. 
+2. the Installer/Launcher runs, and you should select `2` to, install requirements and setup files/folders, it will then return to the menu.
+3. (not currently applicable) If you've multiple, GPUs and brands, a GPU menu will appear, select the GPU brand you intend to use.
 3. After install completes, insert your, text GGUF to `./data/text` and image GGUF to `./data/image`, the settings will auto-detect.
 4. You should then select `1` from the menu to launch the main program, and a browser window should pop-up, or if not then right click on `http://127.0.0.1:7860` and then `Open Link`.
 5. You will then be interacting with the browser interface, where the buttons do what you would expect, but ensure to take a quick look at the "Configuration" tab first.
