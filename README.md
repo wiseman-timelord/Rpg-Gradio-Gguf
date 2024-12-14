@@ -52,7 +52,7 @@ Selection; Menu Options = 1-2, Exit Program = X:
 ### Requirements
 - Linux OS - Modern Linux that is Ubuntu/Debian compatible.
 - Python - Python is installed to `./VENV` does not affect system.
-- LLMs - GGUF format Large Language Models, it will detect parameters.
+- LLMs - Advised models, SDXL-Lightning and Llama3.1, in Gguf. 
 - CPU (v1.00-v1.02) - Any x64 Cpu, scripts use standard llama-cpp-python. 
 - GPU (=>v1.0? Upcoming) - nVidia CUDA Only, See notes for reasoning.
 - Internet - Libraries and Compile stuff, bash installs from web.  
@@ -63,10 +63,10 @@ Instructions are for upcoming GPU enhanced version...
 1. In the terminal run the command "sudo ./Chat-Linux-Gguf.sh" in terminal in the program folder, and ensure the files are executable if there is immediate issue.
 2. the Installer/Launcher runs, and you should select `2` to, install requirements and setup files/folders.
 3. If you've multiple, GPUs and brands, a GPU menu will appear, select the GPU brand you intend to use.
-3. After install completes, insert your `*.gguf` to the newly created folder `./models` (settings auto-detect).
-4. You should then select `1` from the menu to launch the main program, and a browser window should pop-up, but in failing that then right click on `http://127.0.0.1:7860` and then left click `Open Link` to do the same.
+3. After install completes, insert your, text GGUF to `./data/text` and image GGUF to `./data/image`, the settings will auto-detect.
+4. You should then select `1` from the menu to launch the main program, and a browser window should pop-up, or if not then right click on `http://127.0.0.1:7860` and then `Open Link`.
 5. You will then be interacting with the browser interface, where the buttons do what you would expect, but ensure to take a quick look at the "Configuration" tab first.
-6. After finishing your session, then click on `Exit Program` in the browser window, and then the terminal will return to the Bash menu, and then select `X` to exit correctly. 
+6. After finishing your session, then click on `Exit Program` in the browser window, and then the terminal will return to the Bash menu, and then shutdown correctly. 
 
 ### Example Prompts
 1) "Hello there! I never thought I would see you here on the mountain..."
