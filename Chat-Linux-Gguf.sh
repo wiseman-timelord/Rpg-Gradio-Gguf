@@ -175,7 +175,6 @@ PROMPT_TO_SETTINGS = {
         'max_tokens': 500
     }
 }
-
 EOL
     chmod 777 "$TEMPORARY_FILE"
     echo "temporary.py created successfully in ./data."
