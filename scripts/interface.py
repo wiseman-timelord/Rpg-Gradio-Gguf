@@ -61,15 +61,14 @@ def update_keys(new_threads_percent=None, new_agent_name=None, new_agent_role=No
         'agent_name': temporary.agent_name,
         'agent_role': temporary.agent_role,
         'human_name': temporary.human_name,
-        'scene_location': temporary.scene_location,          # New key added
+        'scene_location': temporary.scene_location,  # New key added
         'threads_percent': temporary.threads_percent,
         'session_history': temporary.session_history,
         'selected_steps': temporary.selected_steps,
         'selected_sample_method': temporary.selected_sample_method
     }
     write_to_yaml(data_to_save, './data/persistent.yaml')
-    return "Settings updated successfully!"
-
+    print("Settings updated successfully!")
 
 
 def filter_model_output(raw_output):
@@ -182,11 +181,13 @@ def launch_gradio_interface():
                         )
                         sample_method_dropdown = gr.Dropdown(
                             label="Sample Method",
-                            choices=[method[0] for method in temporary.SAMPLE_METHOD_OPTIONS],  # List of labels
-                            value=temporary.selected_sample_method,    # String value
+                            choices=temporary.SAMPLE_METHOD_OPTIONS,  # List of tuples (label, value)
+                            value=temporary.selected_sample_method,    # String value set to "euler_a"
                             type="value"
                         )
 
+                # Add a Textbox to display the save message
+                save_message = gr.Textbox(label="Save Status", value="", interactive=False)
 
                 # Save Configuration Button
                 with gr.Row():
@@ -198,7 +199,7 @@ def launch_gradio_interface():
                         new_agent_name=new_agent_name,
                         new_agent_role=new_agent_role,
                         new_human_name=new_human_name,
-                        new_scene_location=new_scene_location,  # Pass new_scene_location
+                        new_scene_location=new_scene_location,
                         new_session_history=new_session_history,
                         new_threads_percent=new_threads_percent,
                         new_image_size=new_image_size,
@@ -209,14 +210,14 @@ def launch_gradio_interface():
                         agent_name_input,
                         agent_role_input,
                         human_name_input,
-                        scene_location_input,  # New input added
+                        scene_location_input,
                         session_history_input,
                         threads_slider,
                         image_size_dropdown,
                         steps_dropdown,
                         sample_method_dropdown
                     ],
-                    outputs=[]
+                    outputs=[save_message]  # Add the save_message output here
                 )
 
     interface.launch(inbrowser=True)
