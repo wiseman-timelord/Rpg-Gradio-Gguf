@@ -1,50 +1,73 @@
 # scripts/model.py
 
 from llama_cpp import Llama
+from stable_diffusion_cpp import StableDiffusion
 from scripts import utility
 from gguf_parser import GGUFParser
-import os
-import re
-import json
-from data.temporary import PROMPT_TO_SETTINGS, large_language_model, model_used
+import os, re, json, uuid
+from data.temporary import PROMPT_TO_SETTINGS, large_language_model, model_used, IMAGE_SIZE_OPTIONS
+from data import temporary
 from scripts.utility import calculate_optimal_threads, read_yaml
 
-def process_selected_model(models_dir='./models'):
-    global large_language_model, model_used
-    print(f"Scanning {models_dir} for models...")
-    gguf_files = [f for f in os.listdir(models_dir) if f.endswith(".gguf")]
-    if not gguf_files:
-        raise FileNotFoundError("No valid GGUF models found in the directory.")
+def process_selected_model():
+    """
+    Scans the ./models/text and ./models/image directories to load the first available GGUF models.
+    Initializes both the text and image models and assigns them to temporary globals.
+    """
+    # Load text model
+    text_model_dir = './models/text'
+    image_model_dir = './models/image'
 
-    model_path = os.path.join(models_dir, gguf_files[0])
-    print(f"Selected model: {model_path}")
+    print(f"Scanning {text_model_dir} for GGUF text models...")
+    text_gguf_files = [f for f in os.listdir(text_model_dir) if f.endswith(".gguf")]
+    if not text_gguf_files:
+        raise FileNotFoundError("No valid GGUF text models found in the directory.")
+    text_model_path = os.path.join(text_model_dir, text_gguf_files[0])
+    print(f"Selected text model: {text_model_path}")
 
-    json_files = [f for f in os.listdir(models_dir) if f.endswith(".json")]
-    config_path = os.path.join(models_dir, json_files[0]) if json_files else None
+    # Optional config JSON for text model
+    json_files = [f for f in os.listdir(text_model_dir) if f.endswith(".json")]
+    config_path = os.path.join(text_model_dir, json_files[0]) if json_files else None
 
     metadata = {}
     if config_path:
         with open(config_path, 'r') as file:
             metadata.update(json.load(file))
 
-    parser = GGUFParser(model_path)
+    parser = GGUFParser(text_model_path)
     parser.parse()
     metadata.update(parser.metadata)
-
     n_ctx = metadata.get("llama.context_length", 2048)
-    optimal_threads = calculate_optimal_threads(read_yaml().get('threads_percent', 80))
-    
-    print(f"Initializing model with context length: {n_ctx}, threads: {optimal_threads}")
-    large_language_model = Llama(
-        model_path=model_path,
+    threads_percent = read_yaml().get('threads_percent', 80)
+    optimal_threads = calculate_optimal_threads(threads_percent)
+
+    print(f"Initializing text model with context length: {n_ctx}, threads: {optimal_threads}")
+    temporary.large_language_model = Llama(
+        model_path=text_model_path,
         n_ctx=n_ctx,
         n_threads=optimal_threads,
         n_batch=512,
         use_mmap=False,
         use_mlock=False
     )
-    model_used = True
-    print("Model initialized successfully.")
+    temporary.model_used = True
+    print("Text model initialized successfully.")
+
+    # Load image model
+    print(f"Scanning {image_model_dir} for Stable Diffusion GGUF models...")
+    # Assuming that stable_diffusion_cpp supports GGUF models
+    image_models = [f for f in os.listdir(image_model_dir) if f.endswith(".gguf")]
+    if not image_models:
+        print("No GGUF image models found, Stable Diffusion unavailable.")
+        temporary.stable_diffusion_model = None
+    else:
+        image_model_path = os.path.join(image_model_dir, image_models[0])
+        print(f"Selected image model: {image_model_path}")
+        temporary.stable_diffusion_model = StableDiffusion(
+            model_path=image_model_path,
+            wtype="default"  # Weight type; 'default' auto-detects based on model file
+        )
+        print("Image model initialized successfully.")
 
 def initialize_model(model_path, n_ctx, n_threads):
     global large_language_model, model_used
@@ -61,13 +84,12 @@ def initialize_model(model_path, n_ctx, n_threads):
     print("Model initialized successfully.")
 
 def run_llama_cli(prompt, max_tokens=2000, temperature=0.7, repeat_penalty=1.1):
-    global large_language_model, model_used
-    if not model_used or large_language_model is None:
-        print(f"Model used: {model_used}, Model instance: {large_language_model}")
-        raise RuntimeError("Model is not initialized. Please run the setup-installer and ensure a model is loaded.")
+    if not temporary.model_used or temporary.large_language_model is None:
+        print(f"Model used: {temporary.model_used}, Model instance: {temporary.large_language_model}")
+        raise RuntimeError("Model is not initialized.")
 
     try:
-        response = large_language_model(prompt, max_tokens=max_tokens, temperature=temperature, repeat_penalty=repeat_penalty)
+        response = temporary.large_language_model(prompt, max_tokens=max_tokens, temperature=temperature, repeat_penalty=repeat_penalty)
         if isinstance(response, dict):
             choices = response.get("choices", [])
             if choices:
@@ -80,6 +102,7 @@ def run_llama_cli(prompt, max_tokens=2000, temperature=0.7, repeat_penalty=1.1):
     except Exception as e:
         print(f"Error during inference: {e}")
         return f"Error: Could not generate a response due to: {e}"
+
 
 def read_and_format_prompt(file_name, data, task_name):
     """
@@ -98,10 +121,6 @@ def read_and_format_prompt(file_name, data, task_name):
     except KeyError as e:
         print(f"Error: Missing key {e} in data for prompt formatting.")
         return None
-
-def log_message(message, log_type, prompt_name=None, event_name=None, enable_logging=False):
-    # Optional logging functionality can be implemented here
-    pass
 
 def parse_agent_response(raw_agent_response, data):
     # Cleans up raw_agent_response as before
@@ -153,13 +172,86 @@ def prompt_response(task_name, rotation_counter, enable_logging=False, save_to=N
 
     parsed_response = parse_agent_response(raw_agent_response, runtime_data)
 
-    # Take only the first line of the response
+    # Ensure that the response does not contain image size information
+    # This assumes that the agent does not send back 'size: ...' in its response
+    # If it does, further processing may be needed
     parsed_response = parsed_response.split('\n', 1)[0].strip()
 
     if save_to:
         utility.write_to_yaml(save_to, parsed_response)
 
     if task_name == 'consolidate':
+        # Ensure that only conversation text is appended without image size
         temporary.session_history += f"\n{parsed_response}"
 
     return {'agent_response': parsed_response}
+
+
+def generate_image_from_history(session_history_prompt):
+    """
+    Generates an image based on the session_history prompt using stable_diffusion_model.
+    Returns the path to the generated image.
+    """
+    if temporary.stable_diffusion_model is None:
+        print("Stable Diffusion model not loaded, skipping image generation.")
+        return None
+
+    # Retrieve the selected image size from temporary.py
+    selected_size_str = temporary.IMAGE_SIZE_OPTIONS.get('selected_size', "64x128")
+    if selected_size_str not in temporary.IMAGE_SIZE_OPTIONS['available_sizes']:
+        print(f"Invalid image size selected: {selected_size_str}. Defaulting to 64x128.")
+        selected_size_str = "64x128"
+
+    try:
+        # Ensure only one 'x' is present
+        if selected_size_str.count('x') == 1:
+            width, height = map(int, selected_size_str.split('x'))
+        else:
+            # Handle cases where size might be appended multiple times
+            parts = selected_size_str.split('x')
+            width, height = map(int, parts[:2])
+            print(f"Warning: Image size string '{selected_size_str}' has multiple 'x'. Using first two values: {width}x{height}")
+    except ValueError:
+        print(f"Error parsing image size '{selected_size_str}'. Defaulting to 64x128.")
+        width, height = 64, 128
+
+    # Retrieve the selected number of steps from temporary.py
+    selected_steps = temporary.selected_steps
+    if selected_steps not in temporary.STEPS_OPTIONS:
+        print(f"Invalid number of steps selected: {selected_steps}. Defaulting to 2 steps.")
+        selected_steps = 2
+
+    # Construct a suitable prompt from session history
+    # For example, we use the last line of the session_history as the image prompt
+    prompt = session_history_prompt.strip().split('\n')[-1]
+    # Remove 'size: ' prefix if present
+    if prompt.lower().startswith('size:'):
+        prompt = prompt.split(':', 1)[1].strip()
+
+    if not prompt:
+        prompt = "A generic illustrative scene."
+
+    print(f"Generating image with prompt: '{prompt}', size: {width}x{height}, steps: {selected_steps}")
+    try:
+        output_images = temporary.stable_diffusion_model.txt_to_img(
+            prompt=prompt,
+            width=width,         # Set width based on selected size
+            height=height,       # Set height based on selected size
+            steps=selected_steps # Set steps based on user selection
+        )
+    except Exception as e:
+        print(f"Error during image generation: {e}")
+        return None
+
+    if not os.path.exists('./generated'):
+        os.makedirs('./generated', exist_ok=True)
+    image_filename = f"{uuid.uuid4().hex}.png"
+    image_path = os.path.join('./generated', image_filename)
+    try:
+        output_images[0].save(image_path)
+        print(f"Image generated and saved to {image_path}")
+        return image_path
+    except Exception as e:
+        print(f"Error saving generated image: {e}")
+        return None
+

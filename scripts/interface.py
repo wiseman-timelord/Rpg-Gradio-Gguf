@@ -1,37 +1,29 @@
 # scripts/interface.py
 
-import os
-import signal
+import os, signal
 import data.temporary as temporary
-from data.temporary import (agent_name, agent_role, human_name, session_history, threads_percent, rotation_counter, agent_output, human_input)
+from data.temporary import (agent_name, agent_role, human_name, session_history, threads_percent,
+                            rotation_counter, agent_output, human_input, PROMPT_TO_SETTINGS, IMAGE_SIZE_OPTIONS)
 from scripts.utility import reset_session_state, write_to_yaml, read_yaml
-from scripts.model import prompt_response
+from scripts.model import prompt_response, generate_image_from_history
 import gradio as gr
-import threading
-import time
+import threading, time
 
 def shutdown():
     print("Shutting down the application...")
     os.kill(os.getpid(), signal.SIGTERM)
 
 def reset_session():
-    """
-    Soft reset of session variables
-    """
-    # Read the latest configuration from YAML
     read_config = read_yaml('./data/persistent.yaml')
-    
-    # Reset temporary variables to the values from the configuration
     temporary.agent_name = read_config.get('agent_name', 'Wise-Llama')
     temporary.agent_role = read_config.get('agent_role', 'A wise oracle of sorts')
     temporary.human_name = read_config.get('human_name', 'Human')
     temporary.session_history = read_config.get('session_history', "the conversation started")
-    
-    # Reset session-specific variables
-    reset_session_state()
 
-    # Return the updated values to reflect in UI inputs
-    return temporary.session_history, "", ""
+    reset_session_state()
+    # Return updated UI states, including the default image
+    return temporary.session_history, "", "./data/new_session.jpg"
+
 
 def apply_configuration(new_agent_name, new_agent_role, new_human_name):
     temporary.agent_name = new_agent_name
@@ -41,13 +33,10 @@ def apply_configuration(new_agent_name, new_agent_role, new_human_name):
     # Return the updated values to reflect in UI inputs
     return new_agent_name, new_agent_role, new_human_name
 
-def update_keys(new_threads_percent=None, new_agent_name=None, new_agent_role=None, new_human_name=None, new_session_history=None):
-    """
-    Updates temporary variables and saves them to persistent.yaml.
-    """
+
+def update_keys(new_threads_percent=None, new_agent_name=None, new_agent_role=None, new_human_name=None, new_session_history=None, new_image_size=None):
     if new_threads_percent is not None:
         temporary.threads_percent = int(new_threads_percent)
-
     if new_agent_name is not None:
         temporary.agent_name = new_agent_name
     if new_agent_role is not None:
@@ -56,8 +45,9 @@ def update_keys(new_threads_percent=None, new_agent_name=None, new_agent_role=No
         temporary.human_name = new_human_name
     if new_session_history is not None:
         temporary.session_history = new_session_history
+    if new_image_size is not None:
+        temporary.IMAGE_SIZE_OPTIONS['selected_size'] = new_image_size  # Store as string
 
-    # Save updated values to YAML
     data_to_save = {
         'agent_name': temporary.agent_name,
         'agent_role': temporary.agent_role,
@@ -68,55 +58,39 @@ def update_keys(new_threads_percent=None, new_agent_name=None, new_agent_role=No
     write_to_yaml(data_to_save, './data/persistent.yaml')
     return "Settings updated successfully!"
 
-
 def filter_model_output(raw_output):
-    """
-    Filters the model output to extract the response after the first colon in the first 25 characters.
-    """
     if ":" in raw_output[:25]:
-        # Extract the text after the first colon
         response = raw_output.split(":", 1)[1].strip()
         return f"{temporary.agent_name}: {response}"
     else:
         return raw_output
 
 def chat_with_model(user_input):
-    """
-    Handles the chat interaction: sends user input to the model and processes responses.
-    """
     if not user_input.strip():
-        return "Error: Input cannot be empty.", ""
+        return "Error: Input cannot be empty.", temporary.session_history, None
 
-    # Update the human_input variable
     temporary.human_input = f"{temporary.human_name}: {user_input.strip()}"
 
-    # Process 'converse' prompt
     converse_result = prompt_response('converse', temporary.rotation_counter)
     if 'error' in converse_result:
-        return f"Error in model response: {converse_result['error']}", ""
+        return f"Error in model response: {converse_result['error']}", temporary.session_history, None
 
-    # Filter the model's response
     filtered_response = filter_model_output(converse_result['agent_response'])
-
-    # Update `agent_output` with the filtered response
     temporary.agent_output = filtered_response
 
-    # Process 'consolidate' prompt
     consolidate_result = prompt_response('consolidate', temporary.rotation_counter)
     if 'error' in consolidate_result:
-        return temporary.agent_output, f"Error in model consolidation: {consolidate_result['error']}"
+        return temporary.agent_output, temporary.session_history, None
 
-    # Update `session_history` with only the latest response from 'consolidate'
     temporary.session_history = consolidate_result['agent_response']
 
-    # Return results for UI update
-    return temporary.agent_output, temporary.session_history
+    image_path = generate_image_from_history(temporary.session_history)
+    temporary.latest_image_path = image_path
+
+    return temporary.agent_output, temporary.session_history, image_path
 
 def launch_gradio_interface():
     def get_hardware_details():
-        """
-        Reads and returns the contents of the hardware details file.
-        """
         try:
             with open('./data/hardware_details.txt', 'r') as file:
                 return file.read()
@@ -125,69 +99,88 @@ def launch_gradio_interface():
 
     with gr.Blocks() as interface:
         with gr.Tabs():
-            # Conversation Tab
             with gr.Tab("Conversation"):
                 gr.Markdown("# Chat Interface")
                 with gr.Row():
                     with gr.Column(scale=1):
-                        bot_response = gr.Textbox(label="Agent Output:", lines=10, value="", interactive=False)
-                        user_input = gr.Textbox(label="User Input:", lines=10, placeholder="Type your message here...", interactive=True)
+                        bot_response = gr.Textbox(label="Agent Output:", lines=9, value="", interactive=False)
+                        user_input = gr.Textbox(label="User Input:", lines=9, placeholder="Type your message here...", interactive=True)
                     with gr.Column(scale=1):
-                        session_history_display = gr.Textbox(label="Consolidated History", lines=23, value=temporary.session_history, interactive=False)
+                        session_history_display = gr.Textbox(label="Consolidated History", lines=21, value=temporary.session_history, interactive=False)
+                    with gr.Column(scale=1):
+                        generated_image = gr.Image(
+                            label="Generated Image",
+                            type="filepath",
+                            interactive=False,
+                            height=490,
+                            value="./data/new_session.jpg"  # Set default image upon initialization
+                        )
+
                 with gr.Row():
-                    with gr.Column(scale=1):  # Send Message button twice as wide
-                        send_btn = gr.Button("Send Message")
-                    with gr.Column():  # Reset and Exit buttons half as wide each
-                        reset_btn = gr.Button("Restart Session")
-                        exit_btn = gr.Button("Exit Program")
-                # Define button actions
-                send_btn.click(fn=chat_with_model, inputs=user_input, outputs=[bot_response, session_history_display])
-                reset_btn.click(fn=reset_session, inputs=[], outputs=[session_history_display, bot_response, user_input])
+                    send_btn = gr.Button("Send Message", elem_id="send_message_button")
+                    reset_btn = gr.Button("Restart Session", elem_id="restart_session_button")
+                    exit_btn = gr.Button("Exit Program", elem_id="exit_program_button")
+
+                send_btn.click(fn=chat_with_model, inputs=user_input, outputs=[bot_response, session_history_display, generated_image])
+                reset_btn.click(fn=reset_session, inputs=[], outputs=[session_history_display, bot_response, generated_image])
                 exit_btn.click(fn=shutdown, inputs=[], outputs=[])
 
-            # Parameters Tab
-            with gr.Tab("Parameters"):
-                gr.Markdown("# Roleplay Parameters")
-                agent_name_input = gr.Textbox(label="Agent Name", value=temporary.agent_name)
-                agent_role_input = gr.Textbox(label="Agent Role", value=temporary.agent_role)
-                human_name_input = gr.Textbox(label="Human Name", value=temporary.human_name)
-                session_history_input = gr.Textbox(
-                    label="Default History",
-                    value=temporary.session_history
-                )
-                update_roleplay_btn = gr.Button("Save Roleplay Keys")
-                update_roleplay_btn.click(
-                    fn=lambda new_agent_name, new_agent_role, new_human_name, new_session_history: update_keys(
+            with gr.Tab("Configuration"):
+                gr.Markdown("# Configuration Settings")
+                with gr.Row():
+                    with gr.Column():
+                        gr.Markdown("### Roleplay Parameters")
+                        agent_name_input = gr.Textbox(label="Agent Name", value=temporary.agent_name)
+                        agent_role_input = gr.Textbox(label="Agent Role", value=temporary.agent_role)
+                        human_name_input = gr.Textbox(label="Human Name", value=temporary.human_name)
+                        session_history_input = gr.Textbox(
+                            label="Default History",
+                            value=temporary.session_history
+                        )
+
+                    with gr.Column():
+                        gr.Markdown("### Image Generation Settings")
+                        image_size_dropdown = gr.Dropdown(label="Image Size", choices=temporary.IMAGE_SIZE_OPTIONS['available_sizes'], value=temporary.IMAGE_SIZE_OPTIONS['selected_size'], type="value")
+                        steps_dropdown = gr.Dropdown(label="Steps Used", choices=temporary.STEPS_OPTIONS, value=temporary.selected_steps, type="value")
+                        gr.Markdown("### Hardware Settings")
+                        hardware_details_display = gr.Textbox(
+                            label="Detected Hardware Details",
+                            value=get_hardware_details(),
+                            lines=3,
+                            interactive=False
+                        )
+                        threads_slider = gr.Slider(
+                            label="CPU Threads Usage (%)",
+                            minimum=11,
+                            maximum=100,
+                            step=10,
+                            value=temporary.threads_percent
+                        )
+
+                # Save Configuration Button
+                with gr.Row():
+                    save_configuration_btn = gr.Button("Save Configuration", elem_id="save_configuration_button")
+
+                # Define Save Configuration button action
+                save_configuration_btn.click(
+                    fn=lambda new_agent_name, new_agent_role, new_human_name, new_session_history, new_threads_percent, new_image_size, new_steps_used: update_keys(
                         new_agent_name=new_agent_name,
                         new_agent_role=new_agent_role,
                         new_human_name=new_human_name,
-                        new_session_history=new_session_history
+                        new_session_history=new_session_history,
+                        new_threads_percent=new_threads_percent,
+                        new_image_size=new_image_size,
+                        new_steps_used=new_steps_used
                     ),
-                    inputs=[agent_name_input, agent_role_input, human_name_input, session_history_input],
-                    outputs=[]
-                )
-
-            # Hardware Tab
-            with gr.Tab("Hardware"):
-                gr.Markdown("# Hardware Settings")
-                hardware_details_display = gr.Textbox(
-                    label="Detected Hardware Details",
-                    value=get_hardware_details(),
-                    lines=4,  # Increase vertical space by setting more lines
-                    interactive=False
-                )
-                threads_slider = gr.Slider(
-                    label="CPU Threads Usage (%)",
-                    minimum=10,
-                    maximum=100,
-                    step=10,
-                    value=temporary.threads_percent
-                )
-
-                update_hardware_btn = gr.Button("Save Hardware Keys")
-                update_hardware_btn.click(
-                    fn=lambda new_threads_percent: update_keys(new_threads_percent=new_threads_percent),
-                    inputs=[threads_slider],
+                    inputs=[
+                        agent_name_input,
+                        agent_role_input,
+                        human_name_input,
+                        session_history_input,
+                        threads_slider,
+                        image_size_dropdown,
+                        steps_dropdown
+                    ],
                     outputs=[]
                 )
 
