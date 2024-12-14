@@ -96,6 +96,7 @@ create_persistent_yaml() {
 agent_name: Wise-Llama
 agent_role: A wise oracle of sorts
 human_name: Human
+scene_location: the side of a mountain
 session_history: The conversation started
 threads_percent: 80
 selected_steps: 2
@@ -129,6 +130,7 @@ threads_percent = 80
 agent_output = ""
 human_input = ""
 session_history = "the conversation started"
+scene_location = "the side of a mountain"
 
 # Image Size Options
 IMAGE_SIZE_OPTIONS = {

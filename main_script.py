@@ -35,6 +35,7 @@ def load_persistent_settings():
     data.temporary.agent_name = persistent_data.get('agent_name', data.temporary.agent_name)
     data.temporary.agent_role = persistent_data.get('agent_role', data.temporary.agent_role)
     data.temporary.human_name = persistent_data.get('human_name', data.temporary.human_name)
+    data.temporary.scene_location = persistent_data.get('scene_location', data.temporary.scene_location)  # New key loaded
     data.temporary.session_history = persistent_data.get('session_history', "The conversation started")
     data.temporary.threads_percent = persistent_data.get('threads_percent', data.temporary.threads_percent)
     data.temporary.selected_steps = persistent_data.get('selected_steps', data.temporary.selected_steps)
@@ -54,6 +55,7 @@ def save_persistent_settings():
         'agent_name': data.temporary.agent_name,
         'agent_role': data.temporary.agent_role,
         'human_name': data.temporary.human_name,
+        'scene_location': data.temporary.scene_location,          # New key added
         'threads_percent': data.temporary.threads_percent,
         'session_history': data.temporary.session_history,
         'selected_steps': data.temporary.selected_steps,
