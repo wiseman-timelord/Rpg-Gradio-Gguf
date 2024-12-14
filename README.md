@@ -1,6 +1,6 @@
 # Chat-Linux-Gguf
 - Status: Working, see notes
-- Note: Readme here is mixed content, possibly version features not yet present.
+- Note: Readme here is, mixed and missing, content, until, GPU and Image Generation, features are complete.
 
 ### Description
 Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. 
@@ -111,12 +111,14 @@ Instructions are for upcoming GPU enhanced version...
  
 ### Development
 The current plan for work featured is...
-1. Create plan for re-implementation of CUDA with Unified Memory, investigate how unified memory is done. 
+1. Image generation...
+- Mostly implemented (see pictures).
+- Testing models with more than 1 step, downloading 2/4 step versions of sdxl Lightning in Gguf.  
+". Create plan for re-implementation of CUDA with Unified Memory, investigate how unified memory is done. 
 - installer required to install, nvidia toolkit and nvidia cuda toolkit, then detect nvidia, `GPU Name`, `CUDA Cores Total`, `VRAM Total`. update hardware details to additionally detail the 3 new lines for the gpu.
 - llama will be required to buid towards cuda, check compile arguments, use them to best effectiveness.
 - see how best make use of knowing the number of cuda cores/vram, in the running of the main program; when using unified memory with the cuda compiled llama, what arguments are vaild? CPU Threads, Cuda Cores? whicever it is needs or both, needs to be there on hardware screen. 
 - re-investigate test scripts. 
-2. Image generation; needs to be new window on conversation page, for the current outputted picture, Prompts may need refining to ensure shorter text output, or possibly limit to the nearest end of sentence from X characters in. Would require 1 more prompt, to send the history to the image generation model.  
 3. Optimize for Less Overall Characters, more advanced programming. 
 4. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script(s).
 5. Test and Bugfix, all options and features, soes everything still works.
