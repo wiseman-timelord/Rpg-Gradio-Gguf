@@ -93,12 +93,13 @@ create_persistent_yaml() {
     local PERSISTENT_FILE="./data/persistent.yaml"
     echo "Creating or overwriting persistent.yaml in ./data"
     cat > "$PERSISTENT_FILE" <<EOL
-# ./data/persistent.yaml - default session config:
-human_name: "Human"
-agent_name: "Wise-Llama"
-agent_role: "A wise oracle of sorts"
-session_history: "The conversation started"
+agent_name: Wise-Llama
+agent_role: A wise oracle of sorts
+human_name: Human
+session_history: The conversation started
 threads_percent: 80
+selected_steps: 2
+selected_sample_method: heun
 EOL
     chmod 777 "$PERSISTENT_FILE"
     echo "persistent.yaml created successfully in ./data."
@@ -129,15 +130,30 @@ agent_output = ""
 human_input = ""
 session_history = "the conversation started"
 
+# Image Size Options
+IMAGE_SIZE_OPTIONS = {
+    'available_sizes': ["48x64", "96x128", "192x256", "384x512"],  # Updated to include only desired sizes
+    'selected_size': "192x256"  # Default size as a string
+}
+
 # Steps Options
 STEPS_OPTIONS = [1, 2, 4]  # Available step options
 selected_steps = 2         # Default step
 
-# Image Size Options
-IMAGE_SIZE_OPTIONS = {
-    'available_sizes': ["48x64", "96x128", "192x256", "384x512" , "512x768"],  # Updated to include only desired sizes
-    'selected_size': "192x256"  # Default size as a string
-}
+# Sample Method Options
+SAMPLE_METHOD_OPTIONS = [
+    ("EULER_A", "euler_a"),
+    ("EULER", "euler"),
+    ("HEUN", "heun"),
+    ("DPM2", "dpm2"),
+    ("DPMPP2S_A", "dpmpp2s_a"),
+    ("DPMPP2M", "dpmpp2m"),
+    ("DPMPP2Mv2", "dpmpp2mv2"),
+    ("IPNDM", "ipndm"),
+    ("IPNDM_V", "ipndm_v"),
+    ("LCM", "lcm")
+]
+selected_sample_method = "heun"  # Default sample method, e.g., HEUN
 
 SYNTAX_OPTIONS = [
     "{combined_input}",
@@ -157,6 +173,7 @@ PROMPT_TO_SETTINGS = {
         'max_tokens': 500
     }
 }
+
 EOL
     chmod 777 "$TEMPORARY_FILE"
     echo "temporary.py created successfully in ./data."

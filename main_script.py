@@ -37,6 +37,8 @@ def load_persistent_settings():
     data.temporary.human_name = persistent_data.get('human_name', data.temporary.human_name)
     data.temporary.session_history = persistent_data.get('session_history', "The conversation started")
     data.temporary.threads_percent = persistent_data.get('threads_percent', data.temporary.threads_percent)
+    data.temporary.selected_steps = persistent_data.get('selected_steps', data.temporary.selected_steps)
+    data.temporary.selected_sample_method = persistent_data.get('selected_sample_method', data.temporary.selected_sample_method)
 
     total_threads = os.cpu_count()
     data.temporary.optimal_threads = max(1, (total_threads * data.temporary.threads_percent) // 100)
@@ -53,10 +55,13 @@ def save_persistent_settings():
         'agent_role': data.temporary.agent_role,
         'human_name': data.temporary.human_name,
         'threads_percent': data.temporary.threads_percent,
-        'session_history': data.temporary.session_history
+        'session_history': data.temporary.session_history,
+        'selected_steps': data.temporary.selected_steps,
+        'selected_sample_method': data.temporary.selected_sample_method
     }
     write_to_yaml(data_to_save, './data/persistent.yaml')
     print("Configuration and session settings saved successfully to persistent.yaml.")
+
 
 def background_engine():
     """
