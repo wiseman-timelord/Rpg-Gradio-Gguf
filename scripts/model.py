@@ -231,6 +231,9 @@ def generate_image_from_history(session_history_prompt):
     if prompt.lower().startswith('size:'):
         prompt = prompt.split(':', 1)[1].strip()
 
+    # Incorporate scene_location into the prompt if necessary
+    # Assuming that session_history already includes scene_location from the converse prompt
+
     if not prompt:
         prompt = "A generic illustrative scene."
 
