@@ -19,7 +19,7 @@ def load_and_initialize_model():
     """
     print("Scanning models directory and initializing model...")
     from scripts.model import process_selected_model
-    process_selected_model(models_dir='./models')
+    process_selected_model()
 
 def load_persistent_settings():
     """

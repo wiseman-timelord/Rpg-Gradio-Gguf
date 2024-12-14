@@ -6,6 +6,14 @@ VENV_PATH="$(pwd)/venv"
 REQUIREMENTS_FILE="./data/requirements.txt"
 HARDWARE_FILE="./data/hardware_details.txt"
 
+# Global list of directories to create
+FOLDERS_TO_CREATE=(
+    "./models"
+    "./models/text"
+    "./models/image"
+    "./generated"
+)
+
 # Function to check if running as root
 check_sudo() {
     if [[ $EUID -ne 0 ]]; then
@@ -18,21 +26,22 @@ check_sudo() {
     fi
 }
 
-# Ensure the ./data directory exists
-ensure_data_directory() {
-    if [ ! -d "./data" ]; then
-        echo "Creating ./data directory..."
-        mkdir ./data
-        chmod 777 ./data
-        echo "./data directory created successfully."
-    else
-        echo "./data directory already exists."
-    fi
+# Function to create all necessary directories
+create_folders() {
+    for folder in "${FOLDERS_TO_CREATE[@]}"; do
+        if [ ! -d "$folder" ]; then
+            echo "Creating $folder directory..."
+            mkdir -p "$folder"
+            chmod 777 "$folder"
+            echo "$folder directory created successfully."
+        else
+            echo "$folder directory already exists."
+        fi
+    done
 }
 
 # Function to create __init__.py in ./data
 create_data_init_py() {
-    ensure_data_directory  # Ensure the directory exists
     local INIT_FILE="./data/__init__.py"
     echo "Creating or overwriting __init__.py in ./data"
     cat > "$INIT_FILE" <<EOL
@@ -42,10 +51,9 @@ EOL
     echo "__init__.py created successfully in ./data."
 }
 
+# Function to create requirements.txt in ./data
 create_data_requirements() {
     local DATA_REQUIREMENTS_FILE="./data/requirements.txt"
-    
-    # Create and write to ./data/requirements.txt
     echo "Creating ./data/requirements.txt"
     cat > "$DATA_REQUIREMENTS_FILE" <<EOF
 llama-cpp-python
@@ -53,21 +61,21 @@ gradio
 watchdog
 PyYAML
 gguf-parser
+stable-diffusion-cpp-python
 EOF
-    
     chmod 777 "$DATA_REQUIREMENTS_FILE"
     echo "./data/requirements.txt created successfully."
 }
 
+# Function to create hardware_details.txt in ./data
 create_hardware_details() {
-    ensure_data_directory  # Ensure the directory exists
     local HARDWARE_FILE="./data/hardware_details.txt"
     echo "Detecting hardware information and creating hardware_details.txt in ./data"
 
     # Start writing simplified hardware details
     {
         echo -n "CPU Name : "
-        cat /proc/cpuinfo | grep -m 1 'model name' | awk -F: '{print $2}' | sed 's/^ //'
+        grep -m 1 'model name' /proc/cpuinfo | awk -F: '{print $2}' | sed 's/^ //'
 
         echo -n "CPU Threads Total: "
         lscpu | grep '^CPU(s):' | awk '{print $2}'
@@ -80,11 +88,8 @@ create_hardware_details() {
     echo "Hardware details saved successfully to ./data/hardware_details.txt."
 }
 
-
-
-# Function to create persistent.yaml
+# Function to create persistent.yaml in ./data
 create_persistent_yaml() {
-    ensure_data_directory  # Ensure the directory exists
     local PERSISTENT_FILE="./data/persistent.yaml"
     echo "Creating or overwriting persistent.yaml in ./data"
     cat > "$PERSISTENT_FILE" <<EOL
@@ -92,7 +97,7 @@ create_persistent_yaml() {
 human_name: "Human"
 agent_name: "Wise-Llama"
 agent_role: "A wise oracle of sorts"
-session_history = "The conversation started"
+session_history: "The conversation started"
 threads_percent: 80
 EOL
     chmod 777 "$PERSISTENT_FILE"
@@ -101,41 +106,45 @@ EOL
 
 # Function to create temporary.py in ./data
 create_temporary_py() {
-    ensure_data_directory  # Ensure the directory exists
     local TEMPORARY_FILE="./data/temporary.py"
     echo "Creating or overwriting temporary.py in ./data"
     cat > "$TEMPORARY_FILE" <<EOL
-# Temporary variables for Chat-Linux-Gguf
+# ./data/temporary.py
 
-# General Variables
-session_history = "the conversation started"
+# Program variables
 rotation_counter = 0
 optimal_threads = 4
-
-# Model Variables
 loaded_models = {}
-large_language_model = None  # Renamed model instance
-model_used = False           # Flag to track if the model is used
+large_language_model = None
+model_used = False
+stable_diffusion_model = None
+latest_image_path = None
 
-# Configurable Keys
+# Roleplay Settings
 agent_name = "Wise-Llama"
 agent_role = "A wise oracle of sorts"
 human_name = "Human"
-session_history = "the conversation started"
 threads_percent = 80
-
-# Other Keys
 agent_output = ""
 human_input = ""
+session_history = "the conversation started"
 
-# Syntax Options
+# Steps Options
+STEPS_OPTIONS = [1, 2, 4]  # Available step options
+selected_steps = 2         # Default step
+
+# Image Size Options
+IMAGE_SIZE_OPTIONS = {
+    'available_sizes': ["48x64", "96x128", "192x256", "384x512" , "512x768"],  # Updated to include only desired sizes
+    'selected_size': "192x256"  # Default size as a string
+}
+
 SYNTAX_OPTIONS = [
     "{combined_input}",
     "User: {combined_input}",
     "User:\n{combined_input}"
 ]
 
-# Consolidated Prompt Settings
 PROMPT_TO_SETTINGS = {
     'converse': {
         'temperature': 0.5,
@@ -153,7 +162,7 @@ EOL
     echo "temporary.py created successfully in ./data."
 }
 
-
+# Function to install Python requirements
 install_requirements() {
     local DATA_REQUIREMENTS_FILE="./data/requirements.txt"
     
@@ -182,26 +191,8 @@ run_installer() {
     echo "Running the Setup-Installer..."
     sleep 1
 
-    # Ensure ./logs directory exists
-    if [ ! -d "./logs" ]; then
-        echo "Creating ./logs directory..."
-        mkdir ./logs
-        chmod 777 ./logs
-        echo "./logs directory created."
-    else
-        echo "./logs directory already exists."
-    fi
-    sleep 1
-
-    # Ensure ./models directory exists
-    if [ ! -d "./models" ]; then
-        echo "Creating ./models directory..."
-        mkdir ./models
-        chmod 777 ./models
-        echo "./models directory created."
-    else
-        echo "./models directory already exists."
-    fi
+    # Create all necessary directories
+    create_folders
     sleep 1
 
     # Create persistent.yaml
@@ -245,8 +236,6 @@ run_installer() {
     echo "Setup-Installer processes have been completed."
     sleep 2
 }
-
-
 
 # Launch function
 launch_program() {
@@ -334,5 +323,7 @@ while true; do
         X|x) End_Of_Script ;;
         *) echo "Invalid option, try again." ;;
     esac
+    # Pause briefly before refreshing the menu
+    sleep 2
 done
 
