@@ -123,6 +123,7 @@ The current plan for work featured is...
 - llama will be required to buid towards cuda, check compile arguments, use them to best effectiveness.
 - see how best make use of knowing the number of cuda cores/vram, in the running of the main program; when using unified memory with the cuda compiled llama, what arguments are vaild? CPU Threads, Cuda Cores? whicever it is needs or both, needs to be there on hardware screen. 
 - re-investigate test scripts. 
+3. text boxes need output/input to be like `{human_name}: Message contents here` or `{agent_name}: Message contents here`.
 3. Optimize for Less Overall Characters, more advanced programming. 
 4. Re-Structure Code/Scripts, ensure code is, appropriately and optimally, located in correctly themed/labeled script(s).
 5. Test and Bugfix, all options and features, soes everything still works.
