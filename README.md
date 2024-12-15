@@ -102,10 +102,10 @@ Instructions are for upcoming GPU enhanced version...
 ```
 ./
 ├── data/
-│   ├── temporary.py           # Holds ALL global variables
 │   ├── __init__.py            # to mark the directory as a Python package
 │   ├── persistent.yaml        # Holds default Chatbot configuration
 │   ├── requirements.txt       # Dependencies for the virtual environment
+│   ├── temporary.py           # Holds ALL global variables
 ├── venv/                      # Venv local install folder avoiding system conflict.
 │   ├── *                      # Various libraries installed from `./data/requirements.txt`.
 ├── logs/                      # (Empty) Will contain any produced log files.
