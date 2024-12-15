@@ -1,4 +1,4 @@
-# Chat-Linux-Gguf
+# Rpg-Gradio-Gguf (was Chat-Ubuntu-Gguf)
 - Status: Working, download release (text only).
 - Note: readme.md here with, mixed and missing, content, until either, GPU and Image Generation, features are complete, but its >90% accurate. See development.
 
@@ -26,7 +26,7 @@ Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate con
 - The Installer/Launcher...
 ```
 ================================================================================
-    Chat-Linux-Gguf - Bash Menu
+    Rpg-Gradio-Gguf - Bash Menu
 ================================================================================
 
 
@@ -60,7 +60,7 @@ Selection; Menu Options = 1-2, Exit Program = X:
 ### Usage
 Instructions are for upcoming GPU enhanced version...
 1. Download the release version suted to your hardware, and then unpack to a sensible folder somewhere, then open a terminal in that folder, make "./Chat-Linux-Gguf.sh" executable.
-1. Ensure the files are executable by right clicking them and ticking the appropriate box, or alternatively running `sudo chmod -x Chat-Ununtu-Gguf.sh`.
+1. Ensure the files are executable by right clicking them and ticking the appropriate box, or alternatively running `sudo chmod -x Rpg-Gradio-Gguf.sh`.
 2. In the terminal run the command "sudo ./Chat-Linux-Gguf.sh", its a installer/launcher, libraries install to `./venv`. 
 2. the Installer/Launcher runs, and you should select `2` to, install requirements and setup files/folders, it will then return to the menu.
 3. (not currently applicable) If you've multiple, GPUs and brands, a GPU menu will appear, select the GPU brand you intend to use.
@@ -85,7 +85,7 @@ Instructions are for upcoming GPU enhanced version...
 - Initial File Structure...
 ```
 ./
-├── Chat-Linux-Gguf.sh        # Main Bash launcher script
+├── Rpg-Gradio-Gguf.sh        # Main Bash launcher script
 ├── main_script.py             # Entry point script
 ├── data/ 
 │   ├── new_session.jpg        # Default Image
