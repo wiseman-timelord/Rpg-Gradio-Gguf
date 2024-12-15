@@ -87,7 +87,6 @@ Instructions are for upcoming GPU enhanced version...
 ./
 ├── Chat-Linux-Gguf.sh        # Main Bash launcher script
 ├── main_script.py             # Entry point script
-├── requirements.txt           # Dependencies for the virtual environment
 ├── data/ 
 │   ├── new_session.jpg        # Default Image
 ├── prompts/
@@ -106,8 +105,9 @@ Instructions are for upcoming GPU enhanced version...
 │   ├── temporary.py           # Holds ALL global variables
 │   ├── __init__.py            # to mark the directory as a Python package
 │   ├── persistent.yaml        # Holds default Chatbot configuration
+│   ├── requirements.txt       # Dependencies for the virtual environment
 ├── venv/                      # Venv local install folder avoiding system conflict.
-│   ├── *                      # Various libraries installed from `./requirements.txt`.
+│   ├── *                      # Various libraries installed from `./data/requirements.txt`.
 ├── logs/                      # (Empty) Will contain any produced log files.
 ├── models/                    # (Empty) Directory for, `*.GGUF` and `model_config.json` ,files
 ```
