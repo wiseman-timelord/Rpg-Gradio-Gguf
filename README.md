@@ -76,7 +76,8 @@ Instructions are for upcoming GPU enhanced version...
 4) "Tell me, Wise-Llama, what is humanity's purpose, and dont tell me 42!"
 
 ### Notation
-- Current, testing and advised, model(s): `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF`.
+- Current advised text model(s): `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF` in Q8_0; this model works.
+- Current advised image model(s): *unknown* in Q8_0 (when I find one that works correctly, then..).
 - "Llama.cpp has been working on improving AMD GPU support, but the implementation is not as mature as NVIDIA's CUDA support." -Claude_Sonnet
 - Originally designed for, 4 Python and 1 Bash, scripts; enabling editing with max 5 files in claude_sonnet for free account, thus, able to be edited by anyone.
 
