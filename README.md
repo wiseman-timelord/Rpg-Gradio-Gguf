@@ -116,7 +116,7 @@ The current plan for work featured is...
 1. Image generation...
 - Mostly implemented (see pictures).
 - Testing models; sdxl Lightning in Gguf does not work, nor the one from the other dude. Trying sd3.5 large/large_turbo now.
-". Create plan for re-implementation of CUDA with Unified Memory, investigate how unified memory is done. 
+2. Create plan for re-implementation of CUDA with Unified Memory, investigate how unified memory is done. 
 - installer required to install, nvidia toolkit and nvidia cuda toolkit, then detect nvidia, `GPU Name`, `CUDA Cores Total`, `VRAM Total`. update hardware details to additionally detail the 3 new lines for the gpu.
 - llama will be required to buid towards cuda, check compile arguments, use them to best effectiveness.
 - see how best make use of knowing the number of cuda cores/vram, in the running of the main program; when using unified memory with the cuda compiled llama, what arguments are vaild? CPU Threads, Cuda Cores? whicever it is needs or both, needs to be there on hardware screen. 
