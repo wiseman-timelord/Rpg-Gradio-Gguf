@@ -1,5 +1,5 @@
 # Chat-Linux-Gguf
-- Status: Working, download release only.
+- Status: Working, download release (text only).
 - Note: Readme here is, mixed and missing, content, until, GPU and Image Generation, features are complete. See development.
 
 ### Description
@@ -115,7 +115,7 @@ Instructions are for upcoming GPU enhanced version...
 The current plan for work featured is...
 1. Image generation...
 - Mostly implemented (see pictures).
-- Testing models with more than 1 step, downloading 2/4 step versions of sdxl Lightning in Gguf.  
+- Testing models; sdxl Lightning in Gguf does not work, nor the one from the other dude. Trying sd3.5 large/large_turbo now.
 ". Create plan for re-implementation of CUDA with Unified Memory, investigate how unified memory is done. 
 - installer required to install, nvidia toolkit and nvidia cuda toolkit, then detect nvidia, `GPU Name`, `CUDA Cores Total`, `VRAM Total`. update hardware details to additionally detail the 3 new lines for the gpu.
 - llama will be required to buid towards cuda, check compile arguments, use them to best effectiveness.
