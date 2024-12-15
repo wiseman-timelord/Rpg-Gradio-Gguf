@@ -98,7 +98,7 @@ agent_role: A wise oracle of sorts
 human_name: Human
 scene_location: the side of a mountain
 selected_sample_method: euler_a
-selected_steps: 2
+selected_steps: 4
 session_history: The conversation started
 threads_percent: 80
 EOL
@@ -134,13 +134,13 @@ scene_location = "the side of a mountain"
 
 # Image Size Options
 IMAGE_SIZE_OPTIONS = {
-    'available_sizes': ["192x256", "384x512", "512x768", "768x1024"],  # Updated to include only desired sizes
+    'available_sizes': ["192x256", "256x384", "384x512"],  # Updated to include only desired sizes
     'selected_size': "384x512"  # Default size as a string
 }
 
 # Steps Options
 STEPS_OPTIONS = [1, 2, 4]  # Available step options
-selected_steps = 2         # Default step
+selected_steps = 4         # Default step
 
 # Sample Method Options
 SAMPLE_METHOD_OPTIONS = [
@@ -185,12 +185,12 @@ EOL
 install_requirements() {
     local DATA_REQUIREMENTS_FILE="./data/requirements.txt"
     
-    echo "Installing Python libraries from $DATA_REQUIREMENTS_FILE to the virtual environment..."
+    echo "Installing from $DATA_REQUIREMENTS_FILE to ./venv"
     if [ -f "$DATA_REQUIREMENTS_FILE" ]; then
         "$VENV_PATH/bin/python3" -m pip install --upgrade pip
         "$VENV_PATH/bin/python3" -m pip install -r "$DATA_REQUIREMENTS_FILE"
         if [ $? -ne 0 ]; then
-            echo "Error: Failed to install Python libraries from $DATA_REQUIREMENTS_FILE. Exiting..."
+            echo "Error: Failed install from $DATA_REQUIREMENTS_FILE. Exiting..."
             End_Of_Script
         fi
         echo "Python libraries installed successfully."
@@ -235,7 +235,7 @@ run_installer() {
         echo "Creating virtual environment..."
         python3 -m venv "$VENV_PATH"
         if [ ! -f "$VENV_PATH/bin/pip" ]; then
-            echo "Error: Virtual environment creation failed. Exiting..."
+            echo "Error: VEnv creation failed. Exiting..."
             End_Of_Script
         fi
         echo "Virtual environment created."
@@ -252,7 +252,7 @@ run_installer() {
     create_hardware_details
     sleep 1
 
-    echo "Setup-Installer processes have been completed."
+    echo "Installer processes completed."
     sleep 2
 }
 
@@ -268,7 +268,7 @@ launch_program() {
 
     echo "Verifying virtual environment..."
     if [ ! -d "$VENV_PATH" ]; then
-        echo "Error: Virtual environment not found. Please run the setup-installer first."
+        echo "Error: VEnv not found. Run installer first."
         sleep 3
         End_Of_Script
     else
@@ -276,7 +276,7 @@ launch_program() {
         sleep 1
     fi
 
-    echo "Activating virtual environment and preparing to launch the main program..."
+    echo "Activating VEnv and launching program..."
     source "$VENV_PATH/bin/activate"
     echo "Environment activated."
     sleep 1
@@ -306,7 +306,7 @@ End_Of_Script() {
     fi
 
     # Notify user and exit gracefully
-    echo "All cleanup operations complete. Exiting in 3 seconds..."
+    echo "Cleanup complete. Exiting in 3 seconds..."
     sleep 3
     exit 0
 }
