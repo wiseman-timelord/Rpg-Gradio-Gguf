@@ -186,6 +186,9 @@ def launch_gradio_interface():
                             type="value"
                         )
 
+                # Add a Textbox to display the save message
+                save_message = gr.Textbox(label="Save Status", value="", interactive=False)
+
                 # Save Configuration Button
                 with gr.Row():
                     save_configuration_btn = gr.Button("Save Configuration", elem_id="save_configuration_button")
@@ -214,6 +217,7 @@ def launch_gradio_interface():
                         steps_dropdown,
                         sample_method_dropdown
                     ],
+                    outputs=[save_message]  # Add the save_message output here
                 )
 
     interface.launch(inbrowser=True)
