@@ -2,7 +2,7 @@
 
 # Define paths and files
 PERSISTENT_FILE="./data/persistent.yaml"
-VENV_PATH="$(pwd)/venv"
+VENV_PATH="./venv"
 REQUIREMENTS_FILE="./data/requirements.txt"
 HARDWARE_FILE="./data/hardware_details.txt"
 
@@ -97,10 +97,10 @@ agent_name: Wise-Llama
 agent_role: A wise oracle of sorts
 human_name: Human
 scene_location: the side of a mountain
+selected_sample_method: euler_a
+selected_steps: 2
 session_history: The conversation started
 threads_percent: 80
-selected_steps: 2
-selected_sample_method: heun
 EOL
     chmod 777 "$PERSISTENT_FILE"
     echo "persistent.yaml created successfully in ./data."
@@ -134,8 +134,8 @@ scene_location = "the side of a mountain"
 
 # Image Size Options
 IMAGE_SIZE_OPTIONS = {
-    'available_sizes': ["48x64", "96x128", "192x256", "384x512"],  # Updated to include only desired sizes
-    'selected_size': "192x256"  # Default size as a string
+    'available_sizes': ["192x256", "384x512", "512x768", "768x1024"],  # Updated to include only desired sizes
+    'selected_size': "384x512"  # Default size as a string
 }
 
 # Steps Options
@@ -175,6 +175,7 @@ PROMPT_TO_SETTINGS = {
         'max_tokens': 500
     }
 }
+
 EOL
     chmod 777 "$TEMPORARY_FILE"
     echo "temporary.py created successfully in ./data."
@@ -256,6 +257,7 @@ run_installer() {
 }
 
 # Launch function
+# Launch function
 launch_program() {
     clear
     echo "================================================================================"
@@ -281,7 +283,7 @@ launch_program() {
 
     echo "Launching the main Python script..."
     sleep 2
-    python3 main_script.py --gui
+    "$VENV_PATH/bin/python3" main_script.py --gui  # Corrected to use the Python from the virtual environment
     if [ $? -ne 0 ]; then
         echo "Main program exited. Shutting down..."
         End_Of_Script
@@ -290,6 +292,8 @@ launch_program() {
     echo "Main program launched successfully."
     sleep 1
 }
+
+
 
 # Function to gracefully end the script
 End_Of_Script() {
