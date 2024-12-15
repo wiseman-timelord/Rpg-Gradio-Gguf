@@ -1,5 +1,5 @@
 # Chat-Linux-Gguf
-- Status: Working, see notes
+- Status: Working, download release only.
 - Note: Readme here is, mixed and missing, content, until, GPU and Image Generation, features are complete. See development.
 
 ### Description
