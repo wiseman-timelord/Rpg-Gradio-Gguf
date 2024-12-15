@@ -113,7 +113,7 @@ def launch_gradio_interface():
     with gr.Blocks() as interface:
         with gr.Tabs():
             with gr.Tab("Conversation"):
-                gr.Markdown("# Chat Interface")
+                gr.Markdown("# Roleplay Interface")
                 with gr.Row():
                     with gr.Column(scale=1):
                         bot_response = gr.Textbox(label="Agent Output:", lines=9, value="", interactive=False)
