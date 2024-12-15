@@ -139,7 +139,8 @@ def prompt_response(task_name, rotation_counter, enable_logging=False, save_to=N
         'human_name': temporary.human_name or "User",
         'session_history': temporary.session_history or "No prior conversation.",
         'human_input': temporary.human_input or "No input provided.",
-        'agent_output': temporary.agent_output or "No response generated."
+        'agent_output': temporary.agent_output or "No response generated.",
+        'scene_location': temporary.scene_location or "Unknown Location"
     }
 
     prompt_settings = PROMPT_TO_SETTINGS.get(task_name)
