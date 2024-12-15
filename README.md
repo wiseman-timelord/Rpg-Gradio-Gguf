@@ -88,6 +88,8 @@ Instructions are for upcoming GPU enhanced version...
 ├── Chat-Linux-Gguf.sh        # Main Bash launcher script
 ├── main_script.py             # Entry point script
 ├── requirements.txt           # Dependencies for the virtual environment
+├── data/ 
+│   ├── new_session.jpg        # Default Image
 ├── prompts/
 │   ├── consolidate.txt        # Prompt template for consolidation tasks
 │   ├── converse.txt           # Prompt template for conversation tasks
