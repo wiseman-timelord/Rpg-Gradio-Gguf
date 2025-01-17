@@ -77,7 +77,8 @@ Instructions are for upcoming GPU enhanced version...
 
 ### Notation
 - Current advised text model(s): `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF` in Q8_0; this model works.
-- [flux v2 nsfw](https://huggingface.co/Anibaaal/Flux-Fusion-V2-4step-merge-gguf-nf4) - able to complete in 4 steps. Try this.
+- New model for NSFW text, amazing [Llama 3.1 NSFW GGUF](https://huggingface.co/Novaciano/Llama-3.2-3b-NSFW_Aesir_Uncensored-GGUF)
+- [flux v2 nsfw GGUF](https://huggingface.co/Anibaaal/Flux-Fusion-V2-4step-merge-gguf-nf4) - able to complete image generation in 4 steps. Try this.
 - Current advised image model(s): *unknown* in Q8_0 (when I find one that works correctly, then..).
 - "Llama.cpp has been working on improving AMD GPU support, but the implementation is not as mature as NVIDIA's CUDA support." -Claude_Sonnet
 - Originally designed for, 4 Python and 1 Bash, scripts; enabling editing with max 5 files in claude_sonnet for free account, thus, able to be edited by anyone.
