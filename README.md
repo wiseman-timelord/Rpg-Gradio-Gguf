@@ -1,6 +1,6 @@
 # Rpg-Gradio-Gguf (was Chat-Ubuntu-Gguf)
 - Status: Working.
-- Note: readme.md here with, mixed and missing, content, until either, GPU and Image Generation, features are complete, but its >90% accurate. See development. Latest release for Text and Latest pre-release for Image generation also.
+- Note: readme.md here with, mixed and missing, content, until either, GPU and Image Generation, features are complete, but its >90% accurate. See development. Latest release for Text and Latest pre-release for Image generation also. Stuck in windows projects at the time of writing, must finish them first. Project also needs a cleanup and consistency check.
 
 ### Description
 Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. 
@@ -77,6 +77,7 @@ Instructions are for upcoming GPU enhanced version...
 
 ### Notation
 - Current advised text model(s): `https://huggingface.co/MaziyarPanahi/Llama-3.1-8B-Lexi-Uncensored-V2-GGUF` in Q8_0; this model works.
+- [flux v2 nsfw](https://huggingface.co/Anibaaal/Flux-Fusion-V2-4step-merge-gguf-nf4) - able to complete in 4 steps. Try this.
 - Current advised image model(s): *unknown* in Q8_0 (when I find one that works correctly, then..).
 - "Llama.cpp has been working on improving AMD GPU support, but the implementation is not as mature as NVIDIA's CUDA support." -Claude_Sonnet
 - Originally designed for, 4 Python and 1 Bash, scripts; enabling editing with max 5 files in claude_sonnet for free account, thus, able to be edited by anyone.
