@@ -1,6 +1,6 @@
 # Rpg-Gradio-Gguf (was Chat-Ubuntu-Gguf)
 - Status: Working.
-- Note: readme.md here with, mixed and missing, content, until either, GPU and Image Generation, features are complete, but its >90% accurate. See development. Latest release for Text and Latest pre-release for Image generation also. Stuck in windows projects at the time of writing, must finish them first. Project also needs a cleanup and consistency check.
+- Note: readme.md here with, mixed and missing, content, until either, GPU and Image Generation, features are complete, but its >90% accurate. See development. Latest release for Text and Latest pre-release for Image generation also. Stuck in windows projects at the time of writing, must finish them first. Project also needs a cleanup and consistency check. download release versions.
 
 ### Description
 Its a lightweight Chatbot native to Linux, that uses Gguf models to simulate conversations with contextual awareness in a Gradio interface in your Web-Browser. The idea is its a framework able to be customised to adapt the model interference to any task or purpose, for example, personal manager, email responder, etc. 
