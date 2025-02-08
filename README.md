@@ -1,4 +1,4 @@
-# Rpg-Gradio-Gguf (was Chat-Ubuntu-Gguf)
+# Rpg-Gradio-Gguf (final name undecided)
 - Status: Working.
 - Note: readme.md here with, mixed and missing, content, until either, GPU and Image Generation, features are complete, but its >90% accurate. See development. Latest release for Text and Latest pre-release for Image generation also. Stuck in windows projects at the time of writing, must finish them first. Project also needs a cleanup and consistency check. download release versions.
 
