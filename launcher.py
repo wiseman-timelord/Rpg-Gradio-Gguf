@@ -78,7 +78,7 @@ except ImportError:
 
 # Now safe to import project modules (they print during import)
 from scripts import configure as cfg
-from scripts.inference import load_text_model, load_image_model
+from scripts.inference import load_text_model, load_image_model, unload_text_model, unload_image_model
 from scripts.displays import launch_gradio_interface
 
 
@@ -93,11 +93,27 @@ def shutdown() -> None:
       • "Exit Program" button in Gradio  (via cfg.shutdown_fn)
       • pywebview window [X] close       (webview.start() unblocks naturally)
 
+    Unloads any loaded models before destroying the pywebview window so that
+    VRAM / RAM is released cleanly rather than relying on process teardown.
     Destroying all webview windows causes webview.start() to return in
     main(), which then calls os._exit(0) to terminate the process and
     all background threads.
     """
     print("Shutdown requested...")
+
+    # Unload models cleanly before the process exits
+    try:
+        if cfg.text_model_loaded:
+            unload_text_model()
+    except Exception as e:
+        print(f"Error unloading text model: {e}")
+
+    try:
+        if cfg.image_model_loaded:
+            unload_image_model()
+    except Exception as e:
+        print(f"Error unloading image model: {e}")
+
     try:
         for win in webview.windows:
             win.destroy()
@@ -137,6 +153,41 @@ def initialize_models() -> None:
         print("Image model loaded successfully.")
     else:
         print("WARNING: Image model not loaded. Image generation will be skipped.")
+
+
+def idle_unload_watcher() -> None:
+    """
+    Background daemon thread — unloads models after IDLE_UNLOAD_SECONDS of
+    user inactivity.
+
+    The idle clock is measured by cfg.user_turn_start_time:
+      • None  → model is processing (not user's turn); do nothing.
+      • float → timestamp of when control returned to the user.
+
+    When the elapsed time exceeds cfg.IDLE_UNLOAD_SECONDS, any loaded model
+    is unloaded and user_turn_start_time is reset to None so we don't try
+    to unload again.  The next call to chat_with_model() will lazy-reload
+    the models automatically.
+    """
+    print("Idle-unload watcher started "
+          f"(timeout: {cfg.IDLE_UNLOAD_SECONDS // 60} min).")
+    while True:
+        try:
+            t = cfg.user_turn_start_time
+            if t is not None:
+                elapsed = time.time() - t
+                if elapsed >= cfg.IDLE_UNLOAD_SECONDS:
+                    print(f"User idle for {elapsed:.0f}s — unloading models.")
+                    cfg.user_turn_start_time = None  # reset before unloading
+                    if cfg.text_model_loaded:
+                        unload_text_model()
+                    if cfg.image_model_loaded:
+                        unload_image_model()
+                    print("Models unloaded due to inactivity. "
+                          "They will reload automatically on next message.")
+        except Exception as e:
+            print(f"Idle watcher error: {e}")
+        time.sleep(30)   # check every 30 seconds
 
 
 def background_engine() -> None:
@@ -179,6 +230,10 @@ def main() -> None:
     # Background watcher (daemon thread dies with main process)
     watcher = threading.Thread(target=background_engine, daemon=True)
     watcher.start()
+
+    # Idle-unload watcher (daemon thread — unloads models after inactivity)
+    idle_watcher = threading.Thread(target=idle_unload_watcher, daemon=True)
+    idle_watcher.start()
 
     # Start Gradio server (non-blocking, returns URL)
     local_url = launch_gradio_interface()

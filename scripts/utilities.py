@@ -22,6 +22,7 @@ def calculate_optimal_threads(percent: int = 80) -> int:
 def reset_session_state() -> None:
     """Reset conversation state to defaults (does not touch model refs)."""
     cfg.session_history = "The conversation started."
+    cfg.scenario_log = ""
     cfg.agent_output = ""
     cfg.human_input = ""
     cfg.rotation_counter = 0

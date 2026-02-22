@@ -43,6 +43,78 @@ def _apply_gpu_selection() -> None:
 
 
 # -----------------------------------------------------------------------
+# Model unloading
+# -----------------------------------------------------------------------
+def unload_text_model() -> None:
+    """Release the text model from memory and reset the loaded flag."""
+    if cfg.text_model is not None:
+        print("Unloading text model...")
+        try:
+            if hasattr(cfg.text_model, "close"):
+                cfg.text_model.close()
+        except Exception as e:
+            print(f"  Warning during text model close: {e}")
+        cfg.text_model = None
+    cfg.text_model_loaded = False
+    import gc
+    gc.collect()
+    print("Text model unloaded.")
+
+
+def unload_image_model() -> None:
+    """Release the image model from memory and reset the loaded flag."""
+    if cfg.image_model is not None:
+        print("Unloading image model...")
+        try:
+            if hasattr(cfg.image_model, "close"):
+                cfg.image_model.close()
+        except Exception as e:
+            print(f"  Warning during image model close: {e}")
+        cfg.image_model = None
+    cfg.image_model_loaded = False
+    import gc
+    gc.collect()
+    print("Image model unloaded.")
+
+
+def ensure_models_loaded() -> tuple[bool, str]:
+    """
+    Lazy-load text and image models if they are not already in memory.
+
+    Called by chat_with_model() in displays.py before each inference run
+    so the user does not have to restart the application after changing
+    model folders or after an idle-timeout unload.
+
+    Returns
+    -------
+    (ok: bool, message: str)
+        ok      — True if the text model is available (minimum requirement).
+        message — Human-readable status suitable for the UI status bar.
+    """
+    messages: list[str] = []
+
+    if not cfg.text_model_loaded:
+        print("Lazy-loading text model...")
+        messages.append("Loading text model…")
+        if load_text_model():
+            messages.append("Text model loaded.")
+        else:
+            messages.append("Text model failed to load — check the Model Folder path in Configuration.")
+            return False, " ".join(messages)
+
+    if not cfg.image_model_loaded:
+        print("Lazy-loading image model...")
+        messages.append("Loading image model…")
+        if load_image_model():
+            messages.append("Image model loaded.")
+        else:
+            # Image model is optional — warn but don't block chat
+            messages.append("Image model unavailable (images will be skipped).")
+
+    return True, " ".join(messages) if messages else "Models ready."
+
+
+# -----------------------------------------------------------------------
 # Model loading
 # -----------------------------------------------------------------------
 def load_text_model() -> bool:
@@ -140,7 +212,9 @@ def load_image_model() -> bool:
     try:
         init_kwargs = {
             "model_path": model_path,
-            "vae_decode_only": True,   # We only do txt2img, not img2img
+            # vae_decode_only=True is intentionally omitted — it leaves the VAE
+            # encoder uninitialized in stable-diffusion.cpp, causing a null-ptr
+            # access violation even for txt2img-only use.
         }
         if vae_path:
             init_kwargs["vae_path"] = vae_path
@@ -183,8 +257,11 @@ def run_text_inference(
         raise RuntimeError("Text model is not loaded.")
 
     try:
-        response = cfg.text_model(
-            prompt,
+        # Use the chat completion API so the model's instruct template is applied.
+        # Calling raw completion on an instruct-tuned model causes it to echo
+        # instructions rather than respond to them.
+        response = cfg.text_model.create_chat_completion(
+            messages=[{"role": "user", "content": prompt}],
             max_tokens=max_tokens,
             temperature=temperature,
             repeat_penalty=repeat_penalty,
@@ -192,7 +269,8 @@ def run_text_inference(
         if isinstance(response, dict):
             choices = response.get("choices", [])
             if choices:
-                return choices[0].get("text", "").strip()
+                msg = choices[0].get("message", {})
+                return msg.get("content", "").strip()
             return "No output from model."
         return "Unexpected response format."
     except Exception as e:
@@ -205,18 +283,16 @@ def run_text_inference(
 # -----------------------------------------------------------------------
 PROMPT_TEMPLATES: dict[str, str] = {
     "converse": (
-        "You are {agent_name}, {agent_role}.\n"
-        "You are located at: {scene_location}.\n"
-        "You are speaking with {human_name}.\n"
-        "\n"
-        "Conversation so far:\n"
-        "{session_history}\n"
-        "\n"
-        "{human_name}: {human_input}\n"
-        "\n"
-        "Respond in character as {agent_name}. Stay in character and keep your "
-        "response concise (2-4 sentences). Do not break character or add "
-        "meta-commentary."
+        "Your name is {agent_name}, and you are in the role as the '{agent_role}'. "
+        "The location is '{scene_location}', where {agent_name} and {human_name} are present, "
+        "and the events so far are, '{session_history}'. "
+        "Just now, {human_name} just said '{human_input}' to {agent_name} (you). "
+        "Your task is, in relevance to what {human_name} just said to you, "
+        "respond to {human_name} with one sentence of dialogue followed by a one-sentence "
+        "description of an action you take, "
+        "for example, '\"I'm delighted to see you here, it's quite an unexpected pleasure\", "
+        "{agent_name} says as he offers a warm smile to {human_name}.'. "
+        "Only output {agent_name}'s response — no scene headers, no meta-commentary."
     ),
     "consolidate": (
         "Below is a roleplay conversation. Summarise it into a concise "
@@ -351,6 +427,18 @@ def generate_image(scene_prompt: str | None = None) -> str | None:
         width, height = map(int, size_str.split("x")[:2])
     except ValueError:
         width, height = 768, 768
+
+    # SDXL uses a VAE with 8x downscaling.  At 256×256 the latent space is
+    # only 32×32, which falls below SDXL's minimum attention resolution and
+    # causes a null-pointer access violation inside stable-diffusion.cpp.
+    # Enforce a safe floor of 512×512; also round to nearest multiple of 64
+    # as required by the SDXL architecture.
+    MIN_SIZE = 512
+    width  = max(MIN_SIZE, (width  // 64) * 64)
+    height = max(MIN_SIZE, (height // 64) * 64)
+    if width != int(size_str.split("x")[0]) or height != int(size_str.split("x")[1]):
+        print(f"  Size adjusted from {size_str} → {width}x{height} "
+              f"(SDXL minimum is {MIN_SIZE}x{MIN_SIZE}; must be multiple of 64).")
 
     steps     = cfg.selected_steps if cfg.selected_steps in cfg.STEPS_OPTIONS else 8
     method    = cfg.selected_sample_method

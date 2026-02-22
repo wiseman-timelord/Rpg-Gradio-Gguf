@@ -6,11 +6,12 @@
 # at this URL, and for the shutdown/exit lifecycle.
 
 import os
+import time
 import gradio as gr
 
 from scripts import configure as cfg
 from scripts.utilities import reset_session_state, browse_folder, detect_gpus, detect_cpus
-from scripts.inference import prompt_response, generate_image
+from scripts.inference import prompt_response, generate_image, ensure_models_loaded
 
 
 # -----------------------------------------------------------------------
@@ -61,6 +62,10 @@ def chat_with_model(user_input: str, right_mode: str):
     """
     Main conversation loop: converse → consolidate → image.
     If the right panel is on 'Happenings', skip image generation.
+
+    Models are loaded on-demand (lazy) if they are not already in memory.
+    After a response is delivered, the idle timer is started so the watcher
+    thread can unload models after IDLE_UNLOAD_SECONDS of inactivity.
     """
     if not user_input.strip():
         return (
@@ -70,21 +75,33 @@ def chat_with_model(user_input: str, right_mode: str):
             "Waiting for input...",
         )
 
-    if not cfg.text_model_loaded:
-        return (
-            "Text model is not loaded. Check the Configuration tab.",
-            cfg.session_history,
-            None,
-            "Error: Text model not loaded.",
-        )
+    # Clear the idle timer — it is now the model's turn, not the user's.
+    cfg.user_turn_start_time = None
 
-    cfg.human_input = f"{cfg.human_name}: {user_input.strip()}"
+    # ── Lazy-load models if needed ────────────────────────────────────────
+    if not cfg.text_model_loaded:
+        ok, load_msg = ensure_models_loaded()
+        if not ok:
+            # Restore idle timer so the watcher doesn't spin forever
+            cfg.user_turn_start_time = time.time()
+            return (
+                "Models could not be loaded. Check the Configuration tab.",
+                cfg.session_history,
+                None,
+                load_msg,
+            )
+
+    cfg.human_input = user_input.strip()   # raw text — templates add the name prefix
+
+    # Append the user's line to the running scenario log immediately
+    cfg.scenario_log = (cfg.scenario_log + f"\n{cfg.human_name}: {cfg.human_input}").lstrip()
 
     # --- Step 1: converse --------------------------------------------------------
     result = prompt_response("converse")
     if "error" in result:
+        cfg.user_turn_start_time = time.time()
         return (
-            f"Error: {result['error']}",
+            cfg.scenario_log,
             cfg.session_history,
             None,
             f"Converse error: {result['error']}",
@@ -92,6 +109,9 @@ def chat_with_model(user_input: str, right_mode: str):
 
     filtered = filter_model_output(result["agent_response"])
     cfg.agent_output = filtered
+
+    # Append the agent's response to the scenario log
+    cfg.scenario_log = cfg.scenario_log + f"\n{cfg.agent_output}"
 
     # --- Step 2: consolidate -----------------------------------------------------
     consolidate = prompt_response("consolidate")
@@ -107,7 +127,10 @@ def chat_with_model(user_input: str, right_mode: str):
     else:
         status_msg = "Response generated. Image skipped (Visualizer not active)."
 
-    return cfg.agent_output, cfg.session_history, image_path, status_msg
+    # Control returns to user — start the idle timer.
+    cfg.user_turn_start_time = time.time()
+
+    return cfg.scenario_log, cfg.session_history, image_path, status_msg
 
 
 # -----------------------------------------------------------------------

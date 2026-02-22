@@ -3,15 +3,27 @@
 
 import os
 import json
+import time
 
 # ---------------------------------------------------------------------------
 # Runtime state  (mutable at runtime, not saved automatically)
 # ---------------------------------------------------------------------------
+
+# Idle-unload settings
+# user_turn_start_time is set (to time.time()) every time control returns to
+# the user after a model response.  The idle-watcher thread in launcher.py
+# checks this value and unloads the models if the user has been idle for
+# longer than IDLE_UNLOAD_SECONDS.  It is reset to None while the model is
+# processing (not user's turn) so we never unload mid-generation.
+IDLE_UNLOAD_SECONDS: int = 15 * 60          # 15 minutes
+user_turn_start_time: float | None = None   # None  → not user's turn yet
+
 agent_name: str = "Wise-Llama"
 agent_role: str = "A wise oracle who speaks in riddles and metaphors"
 human_name: str = "Adventurer"
 scene_location: str = "A misty forest clearing at dawn"
 session_history: str = "The conversation started."
+scenario_log: str = ""   # Running per-session dialogue log shown in Scenario Log box
 human_input: str = ""
 agent_output: str = ""
 rotation_counter: int = 0
@@ -69,11 +81,11 @@ VRAM_OPTIONS: list[int] = [2048, 4096, 6144, 8192, 10240, 12288, 16384, 24576]
 # sizes are provided for faster generation on limited hardware.
 IMAGE_SIZE_OPTIONS: dict = {
     "available_sizes": [
-        "256x256", "384x384", "512x512",
+        "512x512",
         "512x768", "768x512", "768x768",
         "768x1024", "1024x768", "1024x1024",
     ],
-    "selected_size": "768x768",
+    "selected_size": "512x512",
 }
 
 STEPS_OPTIONS: list[int] = [2, 4, 6, 8, 10, 15, 20, 25, 30]
@@ -130,7 +142,7 @@ def load_config(path: str | None = None) -> dict:
     global selected_gpu, selected_cpu, auto_unload, max_memory_percent
     global text_model_folder, image_model_folder, vram_assigned
     global selected_steps, selected_sample_method, selected_cfg_scale
-    global default_negative_prompt
+    global default_negative_prompt, user_turn_start_time
 
     path = path or CONFIG_PATH
     if not os.path.exists(path):
