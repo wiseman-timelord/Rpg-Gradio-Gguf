@@ -28,10 +28,6 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
         Rpg-Gradio-Gguf - Installation / Repair
     ===============================================================================
     
-    ============================================================
-      Rpg-Gradio-Gguf  —  Installer / Repair
-    ============================================================
-    
     Python version: 3.12.4
     
     [1/5] Creating directory structure...
