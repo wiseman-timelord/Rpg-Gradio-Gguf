@@ -201,9 +201,7 @@ t.b.a
  
 ### Development
 The current plan for work featured is...
-1. The installer needs to install a lightweight browser into the venv, in order for the program to have its own application style GUI, and not rely on system browser. We would want it to be a somewhat more lightweight option.
-2. When we have the browser implemented, [X] on top right must do same as "Exit Program" button using proper shutdown method.
-3. When I run the program without debug option, it is supposed to run the gradio server and python scripts in the background (but without terminal/console open), and load the GUI. Currently its not doing anything, possibly silently exiting. 
+1. Testing and Bugfixing.
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
