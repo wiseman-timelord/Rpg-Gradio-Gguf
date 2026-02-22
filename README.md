@@ -1,5 +1,5 @@
 # Rpg-Gradio-Gguf
-- Status: Project restart.
+- Status: ALPHA - Project restart, wait a bit and there will be a working version.
 
 ### Description
 Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf models to simulate limitless roleplaing in a Gradio interface in Web-Browser interface. 
