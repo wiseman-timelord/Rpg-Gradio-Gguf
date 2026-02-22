@@ -19,7 +19,7 @@ echo ===========================================================================
 goto :eof
 
 :menu
-cls
+rem cls
 color 0F
 call :header "Rpg-Gradio-Gguf - Main Menu"
 echo.

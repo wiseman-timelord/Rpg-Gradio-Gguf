@@ -137,32 +137,48 @@ def load_config(path: str | None = None) -> dict:
         print(f"Error reading config: {e}")
         return {}
 
-    agent_name = data.get("agent_name", agent_name)
-    agent_role = data.get("agent_role", agent_role)
-    human_name = data.get("human_name", human_name)
-    scene_location = data.get("scene_location", scene_location)
-    session_history = data.get("session_history", session_history)
-    threads_percent = data.get("threads_percent", threads_percent)
-    text_model_folder = data.get("text_model_folder", text_model_folder)
+    # --- Conversation / Personalize panel ---
+    agent_name       = data.get("agent_name",       agent_name)
+    agent_role       = data.get("agent_role",       agent_role)
+    human_name       = data.get("human_name",       human_name)
+    scene_location   = data.get("scene_location",   scene_location)
+    session_history  = data.get("session_history",  session_history)
+
+    # --- Model paths ---
+    text_model_folder  = data.get("text_model_folder",  text_model_folder)
     image_model_folder = data.get("image_model_folder", image_model_folder)
+
+    # --- VRAM budget ---
     vram_assigned = data.get("vram_assigned", vram_assigned)
+
+    # --- Image generation settings ---
     IMAGE_SIZE_OPTIONS["selected_size"] = data.get(
         "image_size", IMAGE_SIZE_OPTIONS["selected_size"]
     )
-    selected_steps = data.get("image_steps", selected_steps)
-    selected_sample_method = data.get("sample_method", selected_sample_method)
-    selected_cfg_scale = data.get("cfg_scale", selected_cfg_scale)
+    selected_steps         = data.get("image_steps",    selected_steps)
+    selected_sample_method = data.get("sample_method",  selected_sample_method)
+    selected_cfg_scale     = data.get("cfg_scale",      selected_cfg_scale)
     default_negative_prompt = data.get("negative_prompt", default_negative_prompt)
 
-    # Hardware selection
-    selected_gpu = data.get("selected_gpu", selected_gpu)
-    selected_cpu = data.get("selected_cpu", selected_cpu)
-    cpu_threads = data.get("cpu_threads", cpu_threads)
-    auto_unload = data.get("auto_unload", auto_unload)
+    # --- Hardware / threading ---
+    selected_gpu       = data.get("selected_gpu",       selected_gpu)
+    selected_cpu       = data.get("selected_cpu",       selected_cpu)
+    auto_unload        = data.get("auto_unload",        auto_unload)
     max_memory_percent = data.get("max_memory_percent", max_memory_percent)
 
+    # cpu_threads is the authoritative absolute thread count.
+    # A stored value of 0 means "not yet set" (installer default), so we
+    # fall back to deriving from threads_percent in that case.
+    # Legacy configs that only have threads_percent also use the fallback.
+    threads_percent = data.get("threads_percent", threads_percent)
+    raw_cpu_threads = data.get("cpu_threads", 0)
+    if raw_cpu_threads and raw_cpu_threads > 0:
+        cpu_threads = max(1, int(raw_cpu_threads))
+    else:
+        cpu_threads = max(1, (CPU_THREADS * threads_percent) // 100)
+
     # Keep optimal_threads in sync with cpu_threads
-    optimal_threads = max(1, cpu_threads)
+    optimal_threads = cpu_threads
 
     print(f"Config loaded from {path}.")
     return data
@@ -172,24 +188,33 @@ def save_config(path: str | None = None) -> None:
     """Persist current globals to persistent.json."""
     path = path or CONFIG_PATH
     data = {
-        "agent_name": agent_name,
-        "agent_role": agent_role,
-        "human_name": human_name,
-        "scene_location": scene_location,
+        # --- Conversation / Personalize panel ---
+        "agent_name":      agent_name,
+        "agent_role":      agent_role,
+        "human_name":      human_name,
+        "scene_location":  scene_location,
         "session_history": session_history,
-        "threads_percent": threads_percent,
-        "text_model_folder": text_model_folder,
+
+        # --- Model paths ---
+        "text_model_folder":  text_model_folder,
         "image_model_folder": image_model_folder,
+
+        # --- VRAM budget ---
         "vram_assigned": vram_assigned,
-        "image_size": IMAGE_SIZE_OPTIONS["selected_size"],
-        "image_steps": selected_steps,
-        "sample_method": selected_sample_method,
-        "cfg_scale": selected_cfg_scale,
+
+        # --- Image generation settings ---
+        "image_size":      IMAGE_SIZE_OPTIONS["selected_size"],
+        "image_steps":     selected_steps,
+        "sample_method":   selected_sample_method,
+        "cfg_scale":       selected_cfg_scale,
         "negative_prompt": default_negative_prompt,
-        "selected_gpu": selected_gpu,
-        "selected_cpu": selected_cpu,
-        "cpu_threads": cpu_threads,
-        "auto_unload": auto_unload,
+
+        # --- Hardware / threading ---
+        "selected_gpu":       selected_gpu,
+        "selected_cpu":       selected_cpu,
+        "cpu_threads":        cpu_threads,
+        "threads_percent":    threads_percent,    # kept for legacy round-trips
+        "auto_unload":        auto_unload,
         "max_memory_percent": max_memory_percent,
     }
     try:

@@ -44,20 +44,39 @@ DOWNLOAD_RETRY_DELAY = 5         # Seconds to wait between retries
 DOWNLOAD_CHUNK_SIZE = 1024 * 512 # 512 KB read chunks
 
 # Default persistent configuration
+# Keys must stay in sync with configure.save_config() / configure.load_config()
 DEFAULT_CONFIG = {
-    "agent_name": "Wise-Llama",
-    "agent_role": "A wise oracle who speaks in riddles and metaphors",
-    "human_name": "Adventurer",
-    "scene_location": "A misty forest clearing at dawn",
+    # --- Conversation / Personalize panel ---
+    "agent_name":      "Wise-Llama",
+    "agent_role":      "A wise oracle who speaks in riddles and metaphors",
+    "human_name":      "Adventurer",
+    "scene_location":  "A misty forest clearing at dawn",
     "session_history": "The conversation started.",
-    "threads_percent": 80,
-    "text_model_folder": "./models/text",
+
+    # --- Model paths ---
+    "text_model_folder":  "./models/text",
     "image_model_folder": "./models/image",
+
+    # --- VRAM budget ---
     "vram_assigned": 8192,
-    "image_size": "768x768",
-    "image_steps": 8,
-    "cfg_scale": 5.0,
-    "sample_method": "euler_a",
+
+    # --- Image generation settings ---
+    "image_size":      "768x768",
+    "image_steps":     8,
+    "sample_method":   "euler_a",
+    "cfg_scale":       5.0,
+    "negative_prompt": (
+        "low quality, blurry, distorted, deformed, ugly, bad anatomy, "
+        "watermark, text, signature"
+    ),
+
+    # --- Hardware / threading ---
+    "selected_gpu":       0,
+    "selected_cpu":       0,
+    "cpu_threads":        0,      # 0 = derive from threads_percent at first load
+    "threads_percent":    80,
+    "auto_unload":        False,
+    "max_memory_percent": 85,
 }
 
 
