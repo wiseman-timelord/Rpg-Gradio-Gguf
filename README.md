@@ -167,7 +167,7 @@ t.b.a
 ```
 
 ### Notation
-- T.B.A.
+- Test input: `Hello, you look wise for a llama, are you a wise llama, that knows wise things?`
 
 
 ### File Structure
