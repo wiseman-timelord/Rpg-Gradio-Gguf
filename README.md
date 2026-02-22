@@ -174,6 +174,7 @@ t.b.a
 ├── data/ 
 │   ├── new_session.jpg        # Default Image
 ├── scripts/
+│   ├── __init__.py           # blank init file
 │   ├── configure.py           # globals/maps/lists, load/save json functions
 │   ├── displays.py           # Gradio interface, browser code
 │   ├── inference.py               # GGUF model handling, model prompting
