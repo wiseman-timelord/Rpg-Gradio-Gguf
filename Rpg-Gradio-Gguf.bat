@@ -19,7 +19,7 @@ echo ===========================================================================
 goto :eof
 
 :menu
-rem cls
+cls
 color 0F
 call :header "Rpg-Gradio-Gguf - Main Menu"
 echo.
@@ -77,10 +77,11 @@ echo Python VENV activated.
 echo.
 
 echo Launching program (silent mode)...
-echo This console will close. The application is running independently.
+echo The app window will open shortly. This console will close.
+echo Output is logged to .\logs\launcher.log
 echo.
 
-:: Launch with pythonw (no console window) and exit batch entirely
+:: Normal mode: pythonw (no console window), pywebview provides the GUI
 start "" /b pythonw.exe .\launcher.py
 timeout /t 2 >nul
 exit
@@ -108,6 +109,9 @@ echo Python VENV activated.
 echo.
 
 echo Launching program (debug mode - console stays open)...
+echo.
+
+:: Debug mode: python (console stays open), same pywebview GUI window
 python .\launcher.py
 
 if errorlevel 1 (

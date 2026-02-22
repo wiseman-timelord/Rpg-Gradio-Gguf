@@ -1,8 +1,11 @@
 # scripts/displays.py
 # Gradio UI: Conversation tab and Configuration tab.
+#
+# The Gradio server always starts non-blocking and returns a local URL.
+# launcher.py is responsible for opening the pywebview window that points
+# at this URL, and for the shutdown/exit lifecycle.
 
 import os
-import signal
 import gradio as gr
 
 from scripts import configure as cfg
@@ -21,8 +24,19 @@ cfg.DETECTED_CPUS = detect_cpus()
 # Callbacks
 # -----------------------------------------------------------------------
 def shutdown() -> None:
-    print("Shutting down application...")
-    os.kill(os.getpid(), signal.SIGTERM)
+    """
+    Request application shutdown.
+
+    Delegates to cfg.shutdown_fn which is set by launcher.py at startup.
+    That function destroys the pywebview window, which unblocks
+    webview.start() in launcher.py, leading to os._exit(0).
+    """
+    if cfg.shutdown_fn is not None:
+        cfg.shutdown_fn()
+    else:
+        # Safety fallback — should never happen in normal operation
+        print("WARNING: shutdown_fn not registered. Force exiting.")
+        os._exit(1)
 
 
 def reset_session():
@@ -193,8 +207,18 @@ def browse_image_folder(current: str) -> str:
 # -----------------------------------------------------------------------
 # Layout
 # -----------------------------------------------------------------------
-def launch_gradio_interface() -> None:
-    """Build and launch the Gradio Blocks interface."""
+def launch_gradio_interface() -> str | None:
+    """
+    Build and launch the Gradio Blocks interface.
+
+    The server always starts non-blocking (prevent_thread_lock=True) so
+    that launcher.py can open a pywebview window pointing at the URL.
+
+    Returns
+    -------
+    str | None
+        The local URL string, or None on failure.
+    """
 
     # Pre-compute hardware display strings
     gpu_names = [
@@ -569,4 +593,13 @@ def launch_gradio_interface() -> None:
 
                 exit_cfg.click(fn=shutdown, inputs=[], outputs=[])
 
-    interface.launch(inbrowser=True)
+    # ------------------------------------------------------------------
+    # Start the Gradio server (non-blocking, no browser)
+    # ------------------------------------------------------------------
+    _app, local_url, _share_url = interface.launch(
+        inbrowser=False,
+        prevent_thread_lock=True,
+        server_name="127.0.0.1",
+    )
+    print(f"Gradio server started at {local_url}")
+    return local_url

@@ -1,20 +1,119 @@
 # launcher.py
 # Entry point for Rpg-Gradio-Gguf.
 # Loads persistent configuration, initializes models, and launches the UI.
+#
+# LAUNCH MODES  (both use the same pywebview window)
+# --------------------------------------------------
+# Normal  (pythonw.exe via batch option 1):
+#   stdout/stderr → ./logs/launcher.log  (pythonw has no console)
+#
+# Debug   (python.exe via batch option 2):
+#   stdout/stderr → console  (console window stays open)
+#
+# In both cases Gradio starts non-blocking and pywebview opens a native
+# application window.  Closing the window [X] or clicking "Exit Program"
+# triggers shutdown() which destroys the pywebview window, unblocks
+# webview.start(), and terminates the process.
 
 import os
 import sys
 import time
 import threading
+import atexit
 
 # Ensure project root is on sys.path so `scripts` package resolves
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# ---------------------------------------------------------------------------
+# Detect console-less mode (pythonw.exe) and redirect output to a log file.
+# pythonw sets sys.stdout and sys.stderr to None, which causes every
+# print() call to crash with "NoneType has no attribute write".
+# ---------------------------------------------------------------------------
+_log_file = None  # keep a reference so it isn't garbage-collected
+
+
+def _setup_logging() -> None:
+    """Redirect stdout/stderr to a log file when running without a console."""
+    global _log_file
+    if sys.stdout is not None and sys.stderr is not None:
+        # Console is available (debug mode) — nothing to do
+        return
+
+    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, "launcher.log")
+
+    _log_file = open(log_path, "w", encoding="utf-8")
+    sys.stdout = _log_file
+    sys.stderr = _log_file
+    atexit.register(_close_log)
+    print(f"Log started — output redirected to {log_path}")
+
+
+def _close_log() -> None:
+    global _log_file
+    if _log_file is not None:
+        try:
+            _log_file.flush()
+            _log_file.close()
+        except Exception:
+            pass
+        _log_file = None
+
+
+# Call immediately — before any other import that might print
+_setup_logging()
+
+
+# ---------------------------------------------------------------------------
+# Verify pywebview is available — fail early if not installed
+# ---------------------------------------------------------------------------
+try:
+    import webview
+except ImportError:
+    print("FATAL: pywebview is not installed.")
+    print("Run the installer (batch option 3) to install all dependencies.")
+    sys.exit(1)
+
+
+# Now safe to import project modules (they print during import)
 from scripts import configure as cfg
 from scripts.inference import load_text_model, load_image_model
 from scripts.displays import launch_gradio_interface
 
 
+# ---------------------------------------------------------------------------
+# Shutdown  (registered on cfg so displays.py can call it)
+# ---------------------------------------------------------------------------
+def shutdown() -> None:
+    """
+    Clean shutdown for the entire application.
+
+    Called from two places:
+      • "Exit Program" button in Gradio  (via cfg.shutdown_fn)
+      • pywebview window [X] close       (webview.start() unblocks naturally)
+
+    Destroying all webview windows causes webview.start() to return in
+    main(), which then calls os._exit(0) to terminate the process and
+    all background threads.
+    """
+    print("Shutdown requested...")
+    try:
+        for win in webview.windows:
+            win.destroy()
+    except Exception as e:
+        print(f"Error destroying webview windows: {e}")
+    # If window destruction didn't unblock main, force exit after a moment
+    threading.Timer(2.0, lambda: os._exit(0)).start()
+
+
+# Register on cfg so displays.py can call it without circular imports
+cfg.shutdown_fn = shutdown
+
+
+# ---------------------------------------------------------------------------
+# Startup helpers
+# ---------------------------------------------------------------------------
 def load_persistent_settings() -> None:
     """Load settings from persistent.json into the configure module."""
     print("Loading persistent settings...")
@@ -65,6 +164,9 @@ def background_engine() -> None:
             time.sleep(10)
 
 
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 def main() -> None:
     """Startup sequence: settings → models → background watcher → UI."""
     print("=" * 50)
@@ -78,8 +180,30 @@ def main() -> None:
     watcher = threading.Thread(target=background_engine, daemon=True)
     watcher.start()
 
-    # Gradio blocks the main thread
-    launch_gradio_interface()
+    # Start Gradio server (non-blocking, returns URL)
+    local_url = launch_gradio_interface()
+    if not local_url:
+        print("FATAL: Gradio server failed to start.")
+        sys.exit(1)
+
+    # Open the pywebview application window
+    print(f"Opening application window → {local_url}")
+    window = webview.create_window(
+        title="Rpg-Gradio-Gguf",
+        url=local_url,
+        width=1280,
+        height=860,
+        resizable=True,
+        min_size=(900, 600),
+    )
+
+    # webview.start() blocks the main thread until ALL windows are closed.
+    # This happens when the user clicks [X] or "Exit Program" calls shutdown().
+    webview.start()
+
+    # If we reach here, the window was closed — terminate everything.
+    print("Application window closed. Exiting.")
+    os._exit(0)
 
 
 if __name__ == "__main__":

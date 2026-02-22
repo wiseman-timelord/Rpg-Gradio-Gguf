@@ -19,6 +19,7 @@ PACKAGES = [
     "gradio>=4.0",
     "Pillow",
     "gguf-parser",
+    "pywebview>=5.0",
 ]
 
 # llama-cpp-python with Vulkan is installed separately via --extra-index-url
@@ -189,7 +190,7 @@ def download_with_resume(url, dest_path, max_retries=DOWNLOAD_MAX_RETRIES,
 def step_create_directories():
     print("\n[1/5] Creating directory structure...")
     for d in ["data", "models", "models/text", "models/image",
-              "scripts", "generated"]:
+              "scripts", "generated", "logs"]:
         ensure_directory(os.path.join(".", d))
         print(f"  OK: ./{d}/")
 
@@ -221,7 +222,7 @@ def step_install_packages():
     # Upgrade pip via the interpreter, not pip.exe itself
     run_cmd(f'{pip_base} install --upgrade pip', "Upgrading pip", check=False)
 
-    # Install standard packages
+    # Install standard packages (includes pywebview for app-style GUI window)
     pkg_string = " ".join(f'"{p}"' for p in PACKAGES)
     if not run_cmd(f'{pip_base} install {pkg_string}', "Installing core packages"):
         return False

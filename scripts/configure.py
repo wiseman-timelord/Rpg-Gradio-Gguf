@@ -18,6 +18,13 @@ rotation_counter: int = 0
 latest_image_path: str | None = None
 
 # ---------------------------------------------------------------------------
+# Shutdown callback — set by launcher.py at startup.
+# displays.py calls this when the user clicks "Exit Program".
+# Using a callback avoids circular imports (launcher → displays → launcher).
+# ---------------------------------------------------------------------------
+shutdown_fn = None
+
+# ---------------------------------------------------------------------------
 # Hardware / threading
 # ---------------------------------------------------------------------------
 CPU_THREADS: int = os.cpu_count() or 4          # Total system threads (constant)
