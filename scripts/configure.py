@@ -20,8 +20,20 @@ latest_image_path: str | None = None
 # ---------------------------------------------------------------------------
 # Hardware / threading
 # ---------------------------------------------------------------------------
-threads_percent: int = 80
-optimal_threads: int = max(1, (os.cpu_count() or 4) * 80 // 100)
+CPU_THREADS: int = os.cpu_count() or 4          # Total system threads (constant)
+threads_percent: int = 80                        # Legacy — kept for compat
+optimal_threads: int = max(1, CPU_THREADS * 80 // 100)
+
+# New hardware selection state
+selected_gpu: int = 0
+selected_cpu: int = 0
+cpu_threads: int = max(1, CPU_THREADS * 80 // 100)  # Absolute thread count
+auto_unload: bool = False
+max_memory_percent: int = 85
+
+# Populated at startup by utilities.detect_gpus / detect_cpus
+DETECTED_GPUS: list[dict] = []
+DETECTED_CPUS: list[dict] = []
 
 # ---------------------------------------------------------------------------
 # Model references  (set after loading)
@@ -41,20 +53,23 @@ image_model_folder: str = "./models/image"
 # VRAM budget (MB) — user picks from dropdown, passed to model loader
 # ---------------------------------------------------------------------------
 vram_assigned: int = 8192
-VRAM_OPTIONS: list[int] = [4096, 8192, 12288, 16384]
+VRAM_OPTIONS: list[int] = [2048, 4096, 6144, 8192, 10240, 12288, 16384, 24576]
 
 # ---------------------------------------------------------------------------
 # Image generation options
 # ---------------------------------------------------------------------------
+# SDXL-appropriate sizes — native resolution is 1024x1024 but smaller
+# sizes are provided for faster generation on limited hardware.
 IMAGE_SIZE_OPTIONS: dict = {
     "available_sizes": [
-        "64x128", "128x128", "128x256",
-        "256x256", "256x512", "512x512",
+        "256x256", "384x384", "512x512",
+        "512x768", "768x512", "768x768",
+        "768x1024", "1024x768", "1024x1024",
     ],
-    "selected_size": "256x256",
+    "selected_size": "768x768",
 }
 
-STEPS_OPTIONS: list[int] = [2, 4, 6, 8, 10, 15, 20]
+STEPS_OPTIONS: list[int] = [2, 4, 6, 8, 10, 15, 20, 25, 30]
 selected_steps: int = 8
 
 SAMPLE_METHOD_OPTIONS: list[str] = [
@@ -62,6 +77,17 @@ SAMPLE_METHOD_OPTIONS: list[str] = [
     "dpm++2s_a", "dpm++2m", "dpm++2mv2", "lcm",
 ]
 selected_sample_method: str = "euler_a"
+
+# CFG scale — how strongly the image follows the prompt.
+# SDXL typically uses 5–7 for best results.
+CFG_SCALE_OPTIONS: list[float] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0]
+selected_cfg_scale: float = 5.0
+
+# Default negative prompt for image generation (SDXL benefits from this)
+default_negative_prompt: str = (
+    "low quality, blurry, distorted, deformed, ugly, bad anatomy, "
+    "watermark, text, signature"
+)
 
 # ---------------------------------------------------------------------------
 # Prompt-to-inference-settings map
@@ -93,9 +119,11 @@ CONFIG_PATH = os.path.join(".", "data", "persistent.json")
 def load_config(path: str | None = None) -> dict:
     """Load persistent.json and update module-level globals. Returns the dict."""
     global agent_name, agent_role, human_name, scene_location, session_history
-    global threads_percent, optimal_threads
+    global threads_percent, optimal_threads, cpu_threads
+    global selected_gpu, selected_cpu, auto_unload, max_memory_percent
     global text_model_folder, image_model_folder, vram_assigned
-    global selected_steps, selected_sample_method
+    global selected_steps, selected_sample_method, selected_cfg_scale
+    global default_negative_prompt
 
     path = path or CONFIG_PATH
     if not os.path.exists(path):
@@ -123,9 +151,18 @@ def load_config(path: str | None = None) -> dict:
     )
     selected_steps = data.get("image_steps", selected_steps)
     selected_sample_method = data.get("sample_method", selected_sample_method)
+    selected_cfg_scale = data.get("cfg_scale", selected_cfg_scale)
+    default_negative_prompt = data.get("negative_prompt", default_negative_prompt)
 
-    total_cores = os.cpu_count() or 4
-    optimal_threads = max(1, (total_cores * threads_percent) // 100)
+    # Hardware selection
+    selected_gpu = data.get("selected_gpu", selected_gpu)
+    selected_cpu = data.get("selected_cpu", selected_cpu)
+    cpu_threads = data.get("cpu_threads", cpu_threads)
+    auto_unload = data.get("auto_unload", auto_unload)
+    max_memory_percent = data.get("max_memory_percent", max_memory_percent)
+
+    # Keep optimal_threads in sync with cpu_threads
+    optimal_threads = max(1, cpu_threads)
 
     print(f"Config loaded from {path}.")
     return data
@@ -147,6 +184,13 @@ def save_config(path: str | None = None) -> None:
         "image_size": IMAGE_SIZE_OPTIONS["selected_size"],
         "image_steps": selected_steps,
         "sample_method": selected_sample_method,
+        "cfg_scale": selected_cfg_scale,
+        "negative_prompt": default_negative_prompt,
+        "selected_gpu": selected_gpu,
+        "selected_cpu": selected_cpu,
+        "cpu_threads": cpu_threads,
+        "auto_unload": auto_unload,
+        "max_memory_percent": max_memory_percent,
     }
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)

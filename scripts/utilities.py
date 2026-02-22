@@ -1,7 +1,13 @@
 # scripts/utilities.py
 # General-purpose helper functions.
+# UPDATED: detect_gpus() now enumerates ALL video adapters on Windows via
+# WMIC (primary) and supplements NVIDIA VRAM with nvidia-smi. This ensures
+# secondary / non-primary GPUs (AMD, Intel, etc.) are listed alongside the
+# primary NVIDIA card in the Selected GPU dropdown.
 
 import os
+import platform
+import subprocess
 from scripts import configure as cfg
 
 
@@ -86,3 +92,252 @@ def estimate_gpu_layers(model_path: str, vram_mb: int) -> int:
     layers = max(0, int(estimated_layers * ratio))
     print(f"VRAM budget ({vram_mb} MB) < model ({file_size_mb:.0f} MB). Offloading ~{layers} layers.")
     return layers
+
+
+# ---------------------------------------------------------------------------
+# Hardware detection — internal helpers
+# ---------------------------------------------------------------------------
+
+def _run_cmd(cmd: list[str], timeout: int = 10) -> str | None:
+    """Run a subprocess and return its stdout, or None on any failure."""
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return None
+
+
+def _detect_gpus_wmic() -> list[dict]:
+    """
+    Enumerate ALL video adapters via WMIC (Windows only).
+
+    Command used:
+        wmic path win32_VideoController get AdapterRAM,Name /format:csv
+
+    WMIC returns properties in alphabetical order after the Node column,
+    giving columns: Node | AdapterRAM | Name.
+
+    Known limitation: WMIC caps AdapterRAM at 4 294 967 295 bytes (~4 GB)
+    even for cards with more VRAM.  Call _enrich_with_nvidia_smi() afterwards
+    to correct NVIDIA entries.
+    """
+    if platform.system() != "Windows":
+        return []
+
+    output = _run_cmd(
+        ["wmic", "path", "win32_VideoController",
+         "get", "AdapterRAM,Name", "/format:csv"]
+    )
+    if not output:
+        return []
+
+    gpus: list[dict] = []
+    idx = 0
+    for line in output.splitlines():
+        line = line.strip()
+        # Skip header row and blank lines
+        if not line or line.lower().startswith("node"):
+            continue
+        parts = [p.strip() for p in line.split(",")]
+        # Expected: [Node, AdapterRAM, Name]
+        if len(parts) < 3:
+            continue
+        name = parts[2]
+        if not name or name.lower() in ("", "name"):
+            continue
+        try:
+            vram_mb = int(parts[1]) // (1024 * 1024) if parts[1] else 0
+        except ValueError:
+            vram_mb = 0
+        gpus.append({"index": idx, "name": name, "vram_mb": vram_mb})
+        idx += 1
+
+    if gpus:
+        print(f"Detected {len(gpus)} GPU(s) via WMIC: "
+              + ", ".join(g["name"] for g in gpus))
+    return gpus
+
+
+def _enrich_with_nvidia_smi(gpus: list[dict]) -> None:
+    """
+    Query nvidia-smi for accurate VRAM figures and update matching GPU
+    entries in *gpus* in-place.
+
+    Matching is done by checking whether either name string is a substring
+    of the other (case-insensitive), which handles WMIC shortening names
+    like "NVIDIA GeForce RTX 3080 Ti" vs nvidia-smi's full string.
+    """
+    output = _run_cmd(
+        ["nvidia-smi",
+         "--query-gpu=index,name,memory.total",
+         "--format=csv,noheader,nounits"]
+    )
+    if not output:
+        return
+
+    nvidia_entries: list[dict] = []
+    for line in output.splitlines():
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) >= 3:
+            try:
+                nvidia_entries.append({
+                    "name":    parts[1],
+                    "vram_mb": int(float(parts[2])),
+                })
+            except ValueError:
+                continue
+
+    for nv in nvidia_entries:
+        nv_lower = nv["name"].lower()
+        for gpu in gpus:
+            wmic_lower = gpu["name"].lower()
+            # Accept if either name is contained within the other
+            if nv_lower in wmic_lower or wmic_lower in nv_lower:
+                old = gpu["vram_mb"]
+                gpu["vram_mb"] = nv["vram_mb"]
+                print(f"  Corrected VRAM for '{gpu['name']}': "
+                      f"{old} MB → {nv['vram_mb']} MB (from nvidia-smi).")
+                break
+
+
+def _detect_gpus_nvidia_smi_only() -> list[dict]:
+    """Build GPU list solely from nvidia-smi (no WMIC)."""
+    output = _run_cmd(
+        ["nvidia-smi",
+         "--query-gpu=index,name,memory.total",
+         "--format=csv,noheader,nounits"]
+    )
+    if not output:
+        return []
+
+    gpus: list[dict] = []
+    for line in output.splitlines():
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) >= 3:
+            try:
+                gpus.append({
+                    "index":   int(parts[0]),
+                    "name":    parts[1],
+                    "vram_mb": int(float(parts[2])),
+                })
+            except ValueError:
+                continue
+
+    if gpus:
+        print(f"Detected {len(gpus)} NVIDIA GPU(s) via nvidia-smi.")
+    return gpus
+
+
+def _detect_gpus_vulkaninfo() -> list[dict]:
+    """Build GPU list from vulkaninfo --summary (AMD / Intel / any Vulkan)."""
+    output = _run_cmd(["vulkaninfo", "--summary"])
+    if not output:
+        return []
+
+    gpus: list[dict] = []
+    idx = 0
+    for line in output.splitlines():
+        ll = line.lower()
+        if "devicename" in ll or "device name" in ll:
+            name = (
+                line.split("=")[-1].strip()
+                if "=" in line
+                else line.split(":")[-1].strip()
+            )
+            gpus.append({"index": idx, "name": name, "vram_mb": 0})
+            idx += 1
+
+    if gpus:
+        print(f"Detected {len(gpus)} GPU(s) via vulkaninfo.")
+    return gpus
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+def detect_gpus() -> list[dict]:
+    """
+    Detect ALL available GPUs and return a list of dicts:
+        [{"index": 0, "name": "...", "vram_mb": 8192}, ...]
+
+    Detection strategy
+    ------------------
+    Windows (primary path):
+      1. WMIC win32_VideoController — enumerates every adapter registered
+         with Windows, including integrated GPUs, secondary discrete cards,
+         and any GPU not supported by nvidia-smi (AMD, Intel Arc, etc.).
+      2. nvidia-smi — used only to correct the VRAM figures for NVIDIA
+         entries, because WMIC hard-caps AdapterRAM at ~4 GB regardless of
+         actual VRAM.
+
+    Fallback (non-Windows or WMIC failure):
+      3. nvidia-smi alone
+      4. vulkaninfo --summary
+    """
+    if platform.system() == "Windows":
+        # Primary: WMIC gives us the full picture
+        gpus = _detect_gpus_wmic()
+        if gpus:
+            _enrich_with_nvidia_smi(gpus)   # fix up NVIDIA VRAM in-place
+            return gpus
+        # WMIC produced nothing — try NVIDIA-only path
+        gpus = _detect_gpus_nvidia_smi_only()
+        if gpus:
+            return gpus
+        # Last resort
+        gpus = _detect_gpus_vulkaninfo()
+        if gpus:
+            return gpus
+    else:
+        # Linux / macOS
+        gpus = _detect_gpus_nvidia_smi_only()
+        if gpus:
+            return gpus
+        gpus = _detect_gpus_vulkaninfo()
+        if gpus:
+            return gpus
+
+    print("No GPUs detected.")
+    return []
+
+
+def detect_cpus() -> list[dict]:
+    """
+    Detect available CPU(s).  Returns a list of dicts:
+        [{"index": 0, "name": "...", "threads": 16}, ...]
+    """
+    total_threads = os.cpu_count() or 4
+    cpu_name = platform.processor()
+
+    # platform.processor() can return empty string on some systems
+    if not cpu_name or cpu_name.strip() == "":
+        try:
+            with open("/proc/cpuinfo", "r") as f:
+                for line in f:
+                    if line.startswith("model name"):
+                        cpu_name = line.split(":")[1].strip()
+                        break
+        except Exception:
+            pass
+
+    if (not cpu_name or cpu_name.strip() == "") and platform.system() == "Windows":
+        output = _run_cmd(["wmic", "cpu", "get", "Name", "/format:csv"])
+        if output:
+            for line in output.splitlines():
+                parts = [p.strip() for p in line.split(",")]
+                if len(parts) >= 2 and parts[1] and "Name" not in parts[1]:
+                    cpu_name = parts[1]
+                    break
+
+    cpu_name = (cpu_name or "Unknown CPU").strip()
+    cpus = [{"index": 0, "name": cpu_name, "threads": total_threads}]
+    print(f"Detected CPU: {cpu_name} ({total_threads} threads).")
+    return cpus
