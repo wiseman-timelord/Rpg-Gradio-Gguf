@@ -231,6 +231,7 @@ Model size: 3B params
 Architecture: sdxl
 ```
 ...claude sonnet had issues fixing this, try different AI.
+2. Could do with a new row on the conversation page, to display prompting stages and if the model is loaded and possibly cpu/ram usage.
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
