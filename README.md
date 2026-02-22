@@ -14,11 +14,11 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 ### Preview
 - The Conversation Page...
 
-![preview_image](media/interaction_page.png)
+![preview_image](media/interaction_page.jpg)
 
 - The Configuration Page...
 
-![preview_image](media/configuration_page.png)
+![preview_image](media/configuration_page.jpg)
 
 <details>
 <summary>The installation processes...(ALPHA)</summary>
