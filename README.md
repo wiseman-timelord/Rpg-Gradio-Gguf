@@ -150,9 +150,6 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
     ```
 
 </details>
-The Installer/Launcher...
-```
-```
 
 ### Requirements
 - Windows - Without proper assessment of the scripts, its Windows 10.
