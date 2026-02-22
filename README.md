@@ -204,6 +204,7 @@ The current plan for work featured is...
 1. There are further UI refinements to do.
 2. The installer needs to install a lightweight browser into the venv, in order for the program to have its own application style GUI. [X] on top right must do same as "Exit Program" button using proper shutdown method.
 3. When I run the program without debug option, it is supposed to run the gradio server and python scripts in the background (but without terminal/console open), and load the GUI. Currently its not doing anything, possibly silently exiting. 
+4. "Agent Output" box should be 2/3 to the proportion of the 1/3 of the "Your Message", currently it looks like 50/50. "Agent Output" should instead be "Scenario Log" (a log of user input, text model responses to the user). 
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
