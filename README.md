@@ -158,8 +158,8 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 ### Models
 Here is some info about the modesls...
 - Text model - This gives you your uncensored RPG brain. Currently: [Qwen3-4B-abliterated-v2-GGUF](https://huggingface.co/mradermacher/Qwen3-4B-abliterated-v2-GGUF). Also considering [Qwen3-4b-Z-Image-Turbo-AbliteratedV1](https://huggingface.co/BennyDaBall/Qwen3-4b-Z-Image-Turbo-AbliteratedV1), this would enable better prompting to image model supposedly.
-- Image model - [Z-Image-Turbo-GGUF](https://huggingface.co/vantagewithai/Z-Image-Turbo-GGUF) TBA.
-- SafeTensors - TBA.
+- Image model - This enables image generation. Currently: [Z-Image-Turbo-GGUF](https://huggingface.co/vantagewithai/Z-Image-Turbo-GGUF) TBA.
+- SafeTensors - [Link1 ae.safetensors](https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors?download=true) or [Link2 ae.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true)], supposedly we need to download this for Z-Image to work, even though the image generation model are GGUF. This is how they do things, because everyone use comfy UI now instead of traditional "Text-To-Image". Possibly we can put this in the installer with download progress indication and resume, as its only ~350MB.
 
 ### Usage
 Instructions are for upcoming GPU enhanced version...
