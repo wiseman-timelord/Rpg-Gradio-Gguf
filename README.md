@@ -201,7 +201,7 @@ t.b.a
  
 ### Development
 The current plan for work featured is...
-1. Testing and Bugfixing, the current error is...
+- Testing and Bugfixing, the current error is...
 ```
 [image_prompt] Sending prompt to model...
 [image_prompt] Response received (278 chars).
@@ -231,7 +231,7 @@ Model size: 3B params
 Architecture: sdxl
 ```
 ...claude sonnet had issues fixing this, try different AI.
-2. Could do with a new row on the conversation page, to display prompting stages and if the model is loaded and possibly cpu/ram usage.
+- Could do with a new row on the conversation page, to display prompting stages and if the model is loaded and possibly cpu/ram usage.
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
