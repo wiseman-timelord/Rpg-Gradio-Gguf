@@ -158,7 +158,8 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 ### Models
 Here is some info about the modesls...
 - Text model - [Qwen3-4B-abliterated-v2-GGUF](https://huggingface.co/mradermacher/Qwen3-4B-abliterated-v2-GGUF) (as you chose). Quant level: aim for a Q4‑class quant (e.g. Q4_K_M or similar) so it sits around ~2–3 GB. That keeps enough headroom for the image model and some system VRAM. This gives you your uncensored RPG brain.
-- Image model - [Wai-NSFW-Illustrious-v140-Q8-GGUF](https://huggingface.co/sothmik/Wai-NSFW-Illustrious-v140-Q8-GGUF)  (GGUF, NSFW, ≤4 GB). Model: waiNSFWIllustrious_v140-Q8_0.gguf. WAI‑NSFW‑Illustrious‑SDXL v14.0, ~2.7 GB GGUF). ~3B params, SDXL architecture, anime‑leaning, explicitly NSFW‑capable. Integrated VAE, so you don’t need a separate VAE file, which is nice for a compact setup. Tuned on Danbooru‑style data with emphasis on pose stability and composition; good for character‑heavy RPG art (portraits, full‑body shots, etc.).
+- Image model - [Z-Image-Turbo-GGUF](https://huggingface.co/vantagewithai/Z-Image-Turbo-GGUF) TBA.
+- SafeTensors - TBA.
 
 ### Usage
 Instructions are for upcoming GPU enhanced version...
