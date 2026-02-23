@@ -157,7 +157,7 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 
 ### Models
 Here is some info about the modesls...
-- Text model - [Qwen3-4B-abliterated-v2-GGUF](https://huggingface.co/mradermacher/Qwen3-4B-abliterated-v2-GGUF) (as you chose). Quant level: aim for a Q4‑class quant (e.g. Q4_K_M or similar) so it sits around ~2–3 GB. That keeps enough headroom for the image model and some system VRAM. This gives you your uncensored RPG brain.
+- Text model - This gives you your uncensored RPG brain. Currently: [Qwen3-4B-abliterated-v2-GGUF](https://huggingface.co/mradermacher/Qwen3-4B-abliterated-v2-GGUF). Also considering [Qwen3-4b-Z-Image-Turbo-AbliteratedV1](https://huggingface.co/BennyDaBall/Qwen3-4b-Z-Image-Turbo-AbliteratedV1), this would enable better prompting to image model supposedly.
 - Image model - [Z-Image-Turbo-GGUF](https://huggingface.co/vantagewithai/Z-Image-Turbo-GGUF) TBA.
 - SafeTensors - TBA.
 
