@@ -202,36 +202,8 @@ t.b.a
  
 ### Development
 The current plan for work featured is...
-- Testing and Bugfixing, the current error is...
-```
-[image_prompt] Sending prompt to model...
-[image_prompt] Response received (278 chars).
-  Size adjusted from 256x256 → 512x512 (SDXL minimum is 512x512; must be multiple of 64).
-Generating image: 512x512, 8 steps, cfg=5.0, method=euler_a
-  Prompt: Anime-style, dawn light, misty forest, wise llama with soft fur, adventurer in simple gear, quiet pose, reflective expre
-  Negative: low quality, blurry, distorted, deformed, ugly, bad anatomy, watermark, text, si
-System Info:
-    SSE3 = 1 |     AVX = 1 |     AVX2 = 1 |     AVX512 = 0 |     AVX512_VBMI = 0 |     AVX512_VNNI = 0 |     FMA = 1 |     NEON = 0 |     ARM_FMA = 0 |     F16C = 1 |     FP16_VA = 0 |     WASM_SIMD = 0 |     VSX = 0 |
-Image generation failed: exception: access violation reading 0x0000000000000000
-```
-...additional model info is...
-```
-https://huggingface.co/sothmik/Wai-NSFW-Illustrious-v140-Q8-GGUF
-
-sothmik / Wai-NSFW-Illustrious-v140-Q8-GGUF 
-Text-to-Image - GGUF - Not-For-All-Audiences
-
-From civitai https://civitai.com/models/827184?modelVersionId=1761560
-Use https://github.com/rainlizard/EasyQuantizationGUI to generate the quantized model.
-the example image can be a reference for comfyui workflow(a little bit complex).
-模型来自 civitai https://civitai.com/models/827184?modelVersionId=1761560
-使用 https://github.com/rainlizard/EasyQuantizationGUI 生成量化模型。
-示例图像可以作为 comfyui 工作流的参考（稍微有点复杂）。
-
-Model size: 3B params
-Architecture: sdxl
-```
-...claude sonnet had issues fixing this, try different AI.
+- Testing and Bugfixing, the current error is with the models, so models are having a rethink/improve, see models section.
+- The new image model needs an ae.safetensors file, this seems to be the norm now, to require a safetensors file. We can put this in the installer with download progress indication and resume, as its only ~350MB, then when setting the image model folder, the program would check if the ae file is in the same folder, and if not, then copy the ae.safetensors to the model folder.
 - Could do with a new row on the conversation page, to display prompting stages and if the model is loaded and possibly cpu/ram usage.
 
 ## DISCLAIMER:
