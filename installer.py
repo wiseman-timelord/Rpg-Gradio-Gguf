@@ -81,17 +81,17 @@ DEFAULT_CONFIG = {
     "vram_assigned": 8192,
 
     # --- Image generation settings (Z-Image-Turbo) ---
-    "image_size":      "768x1024",
-    "image_steps":     8,
+    "image_size":      "512x512",
+    "image_steps":     4,
     "sample_method":   "euler",
-    "cfg_scale":       1.0,
+    "cfg_scale":       2.0,
     "negative_prompt": "",
 
     # --- Hardware / threading ---
     "selected_gpu":       0,
     "selected_cpu":       0,
     "cpu_threads":        0,      # 0 = derive from threads_percent at first load
-    "threads_percent":    80,
+    "threads_percent":    85,
     "auto_unload":        False,
     "max_memory_percent": 85,
 }
