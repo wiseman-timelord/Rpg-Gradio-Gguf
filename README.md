@@ -1,5 +1,5 @@
 # Rpg-Gradio-Gguf
-- Status: It works for 1 Agents, while 2/3 is experimental, where multi-character responses may need more work, however I was asking a bird to speak in songs, and possibly this would be a confusing character handicap for qwen3. Further testing/development needed for 2/3 Agent, currently advise, delete Agent 2 details and save, and just use 1 Agent, there are 2 Agents detailed currently because this is what I am working on.
+- Status: It works for 1 Agents, while 2/3 is experimental, where multi-character responses may need more work, however I was asking a bird to speak in songs, and possibly this would be a confusing character handicap for qwen3. Further testing/development needed for 2/3 Agent, currently advise, delete Agent 2 details and save, and just use 1 Agent, there are 2 Agents detailed currently because this is what is being worked on.
 
 ### Description
 Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf models to simulate limitless roleplaing in a Gradio interface in Web-Browser interface.
