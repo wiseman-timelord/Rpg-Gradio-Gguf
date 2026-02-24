@@ -134,6 +134,8 @@ def load_persistent_settings() -> None:
     """Load settings from persistent.json into the configure module."""
     print("Loading persistent settings...")
     cfg.load_config()
+    # Seed session_history from default_history for the initial session
+    cfg.session_history = cfg.default_history
     print(
         f"  Agent: {cfg.agent_name} | Role: {cfg.agent_role} | "
         f"Threads: {cfg.optimal_threads} | VRAM: {cfg.vram_assigned} MB"

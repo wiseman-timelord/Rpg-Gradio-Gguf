@@ -6,6 +6,9 @@
 #   - Downloads ae.safetensors VAE (~350 MB) required by Z-Image-Turbo
 #   - Updated default config for Z-Image-Turbo parameters
 #   - Updated model download instructions in summary
+#
+# UPDATED: default_history replaces session_history in persistent.json.
+#          Output directory renamed from ./generated to ./output.
 
 import subprocess
 import sys
@@ -60,14 +63,15 @@ DOWNLOAD_CHUNK_SIZE = 1024 * 512 # 512 KB read chunks
 
 # Default persistent configuration
 # Keys must stay in sync with configure.save_config() / configure.load_config()
-# UPDATED: defaults tuned for Z-Image-Turbo (cfg_scale=0, no negatives, 8 steps)
+# UPDATED: defaults tuned for Z-Image-Turbo (cfg_scale=1.0, no negatives, 8 steps)
+# UPDATED: "default_history" replaces "session_history"
 DEFAULT_CONFIG = {
     # --- Conversation / Personalize panel ---
     "agent_name":      "Wise-Llama",
     "agent_role":      "A wise oracle who speaks in riddles and metaphors",
     "human_name":      "Adventurer",
     "scene_location":  "A misty forest clearing at dawn",
-    "session_history": "The conversation started.",
+    "default_history": "The two roleplayers approached one another, and the conversation started.",
 
     # --- Model paths ---
     "text_model_folder":  "./models/text",
@@ -80,7 +84,7 @@ DEFAULT_CONFIG = {
     "image_size":      "768x1024",
     "image_steps":     8,
     "sample_method":   "euler",
-    "cfg_scale":       0.0,
+    "cfg_scale":       1.0,
     "negative_prompt": "",
 
     # --- Hardware / threading ---
@@ -202,7 +206,7 @@ def download_with_resume(url, dest_path, max_retries=DOWNLOAD_MAX_RETRIES,
 def step_create_directories():
     print("\n[1/6] Creating directory structure...")
     for d in ["data", "models", "models/text", "models/image",
-              "scripts", "generated", "logs"]:
+              "scripts", "output", "logs"]:
         ensure_directory(os.path.join(".", d))
         print(f"  OK: ./{d}/")
 
