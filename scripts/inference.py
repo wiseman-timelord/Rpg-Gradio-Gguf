@@ -504,36 +504,55 @@ SYSTEM_PROMPTS: dict[str, str] = {
 # Prompt templates (inline — no external files needed)
 # -----------------------------------------------------------------------
 PROMPT_TEMPLATES: dict[str, str] = {
+    # ── Converse ──────────────────────────────────────────────────────────
+    # {characters_context}       — all active agents with roles
+    # {scene_context}            — location + optional time
+    # {responding_agent_name}    — Agent 1 (the speaker for this turn)
+    # {responding_agent_role}    — Agent 1's role
+    # {human_description}        — human name + optional age/gender
+    # {session_history}          — consolidated narrative so far
+    # {human_input}              — what the human just said
     "converse": (
-        "Your name is {agent_name}, and you are in the role as the '{agent_role}'. "
-        "The location is '{scene_location}', where {agent_name} and {human_name} are present, "
-        "and the events so far are, '{session_history}'. "
-        "Just now, {human_name} just said '{human_input}' to {agent_name} (you). "
-        "Your task is, in relevance to what {human_name} just said to you, "
-        "respond to {human_name} with one sentence of dialogue followed by a one-sentence "
-        "description of an action you take, "
-        "for example, '\"I'm delighted to see you here, it's quite an unexpected pleasure\", "
-        "{agent_name} says as he offers a warm smile to {human_name}.'. "
-        "Only output {agent_name}'s response — no scene headers, no meta-commentary."
+        "The following characters are present in this scene: {characters_context}.\n"
+        "The setting is: {scene_context}.\n"
+        "\n"
+        "You are {responding_agent_name}, embodying the role of '{responding_agent_role}'.\n"
+        "\n"
+        "The events so far are: '{session_history}'.\n"
+        "\n"
+        "Just now, {human_description} said to you: '{human_input}'.\n"
+        "\n"
+        "Your task: respond as {responding_agent_name} with exactly one sentence "
+        "of dialogue followed by one sentence describing a physical action you take. "
+        "Example format: '\"I am pleased you found me here\", "
+        "{responding_agent_name} says, offering a slight bow to {human_description}.'\n"
+        "\n"
+        "Output only {responding_agent_name}'s response — no scene headers, "
+        "no meta-commentary, no narration of other characters."
     ),
+
+    # ── Consolidate ───────────────────────────────────────────────────────
     "consolidate": (
         "Below is a roleplay conversation. Summarise it into a concise "
         "third-person narrative paragraph that preserves all important events, "
         "character actions, and scene details. Keep the summary under 200 words. "
         "Do not add new events.\n"
         "\n"
+        "Characters: {characters_context}\n"
+        "Setting: {scene_context}\n"
+        "\n"
         "Conversation:\n"
         "{session_history}\n"
         "\n"
-        "{human_name}: {human_input}\n"
-        "{agent_name}: {agent_output}\n"
+        "{human_description}: {human_input}\n"
+        "{responding_agent_name}: {agent_output}\n"
         "\n"
         "Summary:"
     ),
-    # The image prompt template feeds the current scene to Z-Engineer.
-    # The system prompt (above) carries all the Z-Image-specific rules;
-    # this user message simply provides the scene context and asks for
-    # the enhanced prompt.
+
+    # ── Image prompt ──────────────────────────────────────────────────────
+    # The system prompt (SYSTEM_PROMPTS["image_prompt"]) carries all the
+    # Z-Image-specific rules; this user message provides scene context.
     "image_prompt": (
         "Rewrite the following scene description as a single vivid visual "
         "prompt paragraph (120-180 words) optimised for Z-Image Turbo. "
@@ -542,7 +561,10 @@ PROMPT_TEMPLATES: dict[str, str] = {
         "natural sentences — no tag lists. Apply all Positive Constraint "
         "rules.\n"
         "\n"
-        "Scene:\n"
+        "Characters present: {characters_context}\n"
+        "Setting: {scene_context}\n"
+        "\n"
+        "Scene narrative:\n"
         "{session_history}\n"
         "\n"
         "Enhanced prompt:"
@@ -578,16 +600,121 @@ def parse_agent_response(raw: str) -> str:
     return cleaned
 
 
+def _is_blank(val: str) -> bool:
+    """Return True if a value should be treated as unset/inactive."""
+    return not val or val.strip().lower() in ("none", "")
+
+
+def _build_characters_context() -> str:
+    """
+    Build a natural-language string listing all active agents.
+
+    An agent is considered active when it has a non-blank, non-'None' name.
+    Each active entry includes the agent's role if set.
+
+    Example output:
+        "Wise-Llama — A wise oracle llama and Blue-Bird — A bird speaking in songs"
+    """
+    entries: list[str] = []
+    agent_slots = [
+        (cfg.agent1_name, cfg.agent1_role),
+        (cfg.agent2_name, cfg.agent2_role),
+        (cfg.agent3_name, cfg.agent3_role),
+    ]
+    for name, role in agent_slots:
+        name = (name or "").strip()
+        role = (role or "").strip()
+        if _is_blank(name):
+            continue
+        if not _is_blank(role):
+            entries.append(f"{name} — {role}")
+        else:
+            entries.append(name)
+
+    if not entries:
+        return "No characters defined."
+    if len(entries) == 1:
+        return entries[0]
+    return ", ".join(entries[:-1]) + f" and {entries[-1]}"
+
+
+def _build_human_description() -> str:
+    """
+    Build a concise human/player description including optional age and gender.
+
+    Blank or 'None' values for age/gender are omitted to keep prompts clean.
+
+    Example: "Benevolent-Adventurer (Male, age 28)" or just "Benevolent-Adventurer"
+    """
+    name   = (cfg.human_name   or "Human").strip()
+    age    = (cfg.human_age    or "").strip()
+    gender = (cfg.human_gender or "").strip()
+
+    extras: list[str] = []
+    if not _is_blank(gender):
+        extras.append(gender)
+    if not _is_blank(age):
+        extras.append(f"age {age}")
+
+    if extras:
+        return f"{name} ({', '.join(extras)})"
+    return name
+
+
+def _build_scene_context() -> str:
+    """
+    Build the scene/setting string, appending event time only if set.
+
+    Example: "A misty forest clearing at 16:20" or "A misty forest clearing"
+    """
+    location   = (cfg.scene_location or "Unknown Location").strip()
+    event_time = (cfg.event_time     or "").strip()
+    if not _is_blank(event_time):
+        return f"{location} at {event_time}"
+    return location
+
+
+def _get_responding_agent() -> tuple[str, str]:
+    """
+    Return ``(name, role)`` for the primary responding agent (Agent 1).
+    """
+    name = (cfg.agent1_name or "Agent").strip()
+    role = (cfg.agent1_role or "").strip()
+    if _is_blank(name):
+        name = "Agent"
+    return name, role
+
+
 def _build_runtime_data() -> dict:
-    """Assemble the placeholder dict used by prompt templates."""
+    """
+    Assemble the placeholder dict used by all prompt templates.
+
+    Dynamic context strings are computed here so templates stay readable and
+    any blank / 'None' fields are silently omitted from the resulting prompt.
+    """
+    characters_ctx = _build_characters_context()
+    human_desc     = _build_human_description()
+    scene_ctx      = _build_scene_context()
+    r_name, r_role = _get_responding_agent()
+
     return {
-        "agent_name":     cfg.agent_name,
-        "agent_role":     cfg.agent_role,
-        "human_name":     cfg.human_name,
-        "session_history": cfg.session_history or "No prior conversation.",
-        "human_input":    cfg.human_input or "",
-        "agent_output":   cfg.agent_output or "",
+        # Computed context strings
+        "characters_context":    characters_ctx,
+        "human_description":     human_desc,
+        "scene_context":         scene_ctx,
+        "responding_agent_name": r_name,
+        "responding_agent_role": r_role,
+
+        # Legacy / convenience aliases
+        "agent_name":     r_name,
+        "agent_role":     r_role,
+        "human_name":     cfg.human_name or "Human",
         "scene_location": cfg.scene_location or "Unknown Location",
+
+        # Per-turn values
+        "session_history": cfg.session_history or "No prior conversation.",
+        "human_input":     cfg.human_input     or "",
+        "agent_output":    cfg.agent_output     or "",
     }
 
 

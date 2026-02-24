@@ -1,18 +1,17 @@
 # scripts/configure.py
 # Central configuration: runtime globals, option lists, JSON persistence.
 #
-# UPDATED for Z-Image-Turbo + Qwen3-4b-Z-Image-Turbo-AbliteratedV1:
-#   - cfg_scale default → 1.0 (sd.cpp distilled models need cfg=1.0;
-#     0.0 triggers unconditioned mode which ignores the prompt entirely)
-#   - Negative prompt default → "" (Z-Image-Turbo ignores negatives)
-#   - Steps default → 8 (Turbo is optimised for 8 NFEs)
-#   - Sample method default → "euler" (stable for Z-Image-Turbo)
-#   - Image sizes include larger options suitable for Z-Image
+# UPDATED for multi-agent support:
+#   - agent_name / agent_role replaced by agent1/2/3 name and role
+#   - human_age, human_gender added to human description
+#   - event_time added alongside scene_location
+#   - GENDER_OPTIONS constant used by human gender dropdown
 #
-# UPDATED: default_history / session_history separation
-#   - default_history  → the starting-point template saved in JSON / Personalize
-#   - session_history   → the running consolidated narrative (mutated each turn)
-#   - Session image tracking and per-session output folders
+# UPDATED for Z-Image-Turbo + Qwen3-4b-Z-Image-Turbo-AbliteratedV1:
+#   - cfg_scale default → 1.0
+#   - Negative prompt default → ""
+#   - Steps default → 8
+#   - Sample method default → "euler"
 
 import os
 import json
@@ -23,81 +22,91 @@ import time
 # ---------------------------------------------------------------------------
 
 # Idle-unload settings
-# user_turn_start_time is set (to time.time()) every time control returns to
-# the user after a model response.  The idle-watcher thread in launcher.py
-# checks this value and unloads the models if the user has been idle for
-# longer than IDLE_UNLOAD_SECONDS.  It is reset to None while the model is
-# processing (not user's turn) so we never unload mid-generation.
 IDLE_UNLOAD_SECONDS: int = 15 * 60          # 15 minutes
 user_turn_start_time: float | None = None   # None  → not user's turn yet
 
-agent_name: str = "Wise-Llama"
-agent_role: str = "A wise oracle who speaks in riddles and metaphors"
-human_name: str = "Adventurer"
-scene_location: str = "A misty forest clearing at dawn"
+# ---------------------------------------------------------------------------
+# Agent fields  (up to 3 agents; empty/None means agent is inactive)
+# ---------------------------------------------------------------------------
+GENDER_OPTIONS: list[str] = ["None", "Male", "Female"]
 
-# default_history is the starting-point template.  It is saved to / loaded
-# from persistent.json and shown in the "Default History" box on the
-# Personalize panel.  It is NOT mutated during conversation.
+agent1_name: str = "Wise-Llama"
+agent1_role: str = "A wise oracle llama"
+
+agent2_name: str = "Blue-Bird"
+agent2_role: str = "A bird speaking in songs"
+
+agent3_name: str = ""
+agent3_role: str = ""
+
+# ---------------------------------------------------------------------------
+# Human / Player fields
+# ---------------------------------------------------------------------------
+human_name: str   = "Benevolent-Adventurer"
+human_age: str    = ""           # blank / "None" -> omit from prompts
+human_gender: str = "None"       # "None" -> omit from prompts
+
+# ---------------------------------------------------------------------------
+# Scene / setting
+# ---------------------------------------------------------------------------
+scene_location: str = "A misty forest clearing"
+event_time: str     = "16:20"    # blank / "None" -> omit from prompts
+
+# ---------------------------------------------------------------------------
+# Session narrative
+# ---------------------------------------------------------------------------
 default_history: str = (
-    "The two roleplayers approached one another, and the conversation started."
+    "The three roleplayers approached one another, and the conversation started."
 )
-
-# session_history is the running consolidated narrative.  Each turn the
-# consolidation prompt rewrites it.  Shown in "Consolidated History".
 session_history: str = ""
 
-scenario_log: str = ""   # Running per-session dialogue log shown in Scenario Log box
+scenario_log: str = ""
 human_input: str = ""
 agent_output: str = ""
 rotation_counter: int = 0
 latest_image_path: str | None = None
 
-# Per-session image tracking  (for Sequence panel in Chronicler)
-session_image_paths: list[str] = []    # all images generated this session
-session_folder: str | None = None      # e.g. "./output/misty_forest_cle"
+# Per-session image tracking
+session_image_paths: list[str] = []
+session_folder: str | None = None
 
 # ---------------------------------------------------------------------------
-# Shutdown callback — set by launcher.py at startup.
-# displays.py calls this when the user clicks "Exit Program".
-# Using a callback avoids circular imports (launcher → displays → launcher).
+# Shutdown callback -- set by launcher.py at startup.
 # ---------------------------------------------------------------------------
 shutdown_fn = None
 
 # ---------------------------------------------------------------------------
 # Hardware / threading
 # ---------------------------------------------------------------------------
-CPU_THREADS: int = os.cpu_count() or 4          # Total system threads (constant)
-threads_percent: int = 80                        # Legacy — kept for compat
+CPU_THREADS: int = os.cpu_count() or 4
+threads_percent: int = 80
 optimal_threads: int = max(1, CPU_THREADS * 80 // 100)
 
-# New hardware selection state
 selected_gpu: int = 0
 selected_cpu: int = 0
-cpu_threads: int = max(1, CPU_THREADS * 80 // 100)  # Absolute thread count
+cpu_threads: int = max(1, CPU_THREADS * 80 // 100)
 auto_unload: bool = False
 max_memory_percent: int = 85
 
-# Populated at startup by utilities.detect_gpus / detect_cpus
 DETECTED_GPUS: list[dict] = []
 DETECTED_CPUS: list[dict] = []
 
 # ---------------------------------------------------------------------------
-# Model references  (set after loading)
+# Model references
 # ---------------------------------------------------------------------------
-text_model = None          # Llama instance
-image_model = None         # StableDiffusion instance
+text_model = None
+image_model = None
 text_model_loaded: bool = False
 image_model_loaded: bool = False
 
 # ---------------------------------------------------------------------------
-# Paths (user-configurable)
+# Paths
 # ---------------------------------------------------------------------------
 text_model_folder: str = "./models/text"
 image_model_folder: str = "./models/image"
 
 # ---------------------------------------------------------------------------
-# VRAM budget (MB) — user picks from dropdown, passed to model loader
+# VRAM budget (MB)
 # ---------------------------------------------------------------------------
 vram_assigned: int = 8192
 VRAM_OPTIONS: list[int] = [2048, 4096, 6144, 8192, 10240, 12288, 16384, 24576]
@@ -105,8 +114,6 @@ VRAM_OPTIONS: list[int] = [2048, 4096, 6144, 8192, 10240, 12288, 16384, 24576]
 # ---------------------------------------------------------------------------
 # Image generation options  (tuned for Z-Image-Turbo)
 # ---------------------------------------------------------------------------
-# Z-Image-Turbo supports a wide range of resolutions.  Multiples of 64.
-# It works well at 512-1024 range; 768x1024 is a sweet spot for portraits.
 IMAGE_SIZE_OPTIONS: dict = {
     "available_sizes": [
         "256x256", "256x512", "512x256",
@@ -114,12 +121,11 @@ IMAGE_SIZE_OPTIONS: dict = {
         "512x768", "768x512", "768x768",
         "768x1024", "1024x768", "1024x1024",
     ],
-    "selected_size": "768x1024",
+    "selected_size": "512x256",
 }
 
-# Z-Image-Turbo is a distilled model optimised for low step counts (8 NFEs).
 STEPS_OPTIONS: list[int] = [4, 6, 8, 10, 12, 15, 20]
-selected_steps: int = 8
+selected_steps: int = 4
 
 SAMPLE_METHOD_OPTIONS: list[str] = [
     "euler", "euler_a", "heun", "dpm2",
@@ -127,13 +133,9 @@ SAMPLE_METHOD_OPTIONS: list[str] = [
 ]
 selected_sample_method: str = "euler"
 
-# CFG scale — Z-Image-Turbo (distilled/Turbo models) should use 0.0.
-# Higher values are kept as options for experimentation.
 CFG_SCALE_OPTIONS: list[float] = [1.0, 1.5, 2.0, 3.0, 5.0, 7.0]
 selected_cfg_scale: float = 1.0
 
-# Z-Image-Turbo mostly ignores negative prompts, so default is empty.
-# Users can still enter one for experimentation.
 default_negative_prompt: str = ""
 
 # ---------------------------------------------------------------------------
@@ -158,16 +160,27 @@ PROMPT_TO_SETTINGS: dict = {
 }
 
 # ---------------------------------------------------------------------------
-# Default RP settings — used by "Restore RP Defaults" to reset to
-# the values the installer would have written to persistent.json.
+# Default RP settings -- used by "Restore RP Defaults"
 # ---------------------------------------------------------------------------
 DEFAULT_RP_SETTINGS: dict = {
-    "agent_name":     "Wise-Llama",
-    "agent_role":     "A wise oracle who speaks in riddles and metaphors",
-    "human_name":     "Adventurer",
-    "scene_location": "A misty forest clearing at dawn",
+    "agent1_name": "Wise-Llama",
+    "agent1_role": "A wise oracle llama",
+
+    "agent2_name": "Blue-Bird",
+    "agent2_role": "A bird speaking in songs",
+
+    "agent3_name": "",
+    "agent3_role": "",
+
+    "human_name":   "Benevolent-Adventurer",
+    "human_age":    "",
+    "human_gender": "None",
+
+    "scene_location": "A misty forest clearing",
+    "event_time":     "16:20",
+
     "default_history": (
-        "The two roleplayers approached one another, "
+        "The three roleplayers approached one another, "
         "and the conversation started."
     ),
 }
@@ -180,7 +193,11 @@ CONFIG_PATH = os.path.join(".", "data", "persistent.json")
 
 def load_config(path: str | None = None) -> dict:
     """Load persistent.json and update module-level globals. Returns the dict."""
-    global agent_name, agent_role, human_name, scene_location
+    global agent1_name, agent1_role
+    global agent2_name, agent2_role
+    global agent3_name, agent3_role
+    global human_name, human_age, human_gender
+    global scene_location, event_time
     global default_history, session_history
     global threads_percent, optimal_threads, cpu_threads
     global selected_gpu, selected_cpu, auto_unload, max_memory_percent
@@ -200,23 +217,33 @@ def load_config(path: str | None = None) -> dict:
         print(f"Error reading config: {e}")
         return {}
 
-    # --- Conversation / Personalize panel ---
-    agent_name       = data.get("agent_name",       agent_name)
-    agent_role       = data.get("agent_role",       agent_role)
-    human_name       = data.get("human_name",       human_name)
-    scene_location   = data.get("scene_location",   scene_location)
+    # --- Agent fields (support legacy single-agent keys for old configs) ---
+    legacy_name = data.get("agent_name", "")
+    legacy_role = data.get("agent_role", "")
 
-    # default_history is the saved starting template.
-    # Legacy configs may still use the old "session_history" key.
-    default_history  = data.get(
+    agent1_name = data.get("agent1_name", legacy_name or agent1_name)
+    agent1_role = data.get("agent1_role", legacy_role or agent1_role)
+
+    agent2_name = data.get("agent2_name", agent2_name)
+    agent2_role = data.get("agent2_role", agent2_role)
+
+    agent3_name = data.get("agent3_name", agent3_name)
+    agent3_role = data.get("agent3_role", agent3_role)
+
+    # --- Human fields ---
+    human_name   = data.get("human_name",   human_name)
+    human_age    = data.get("human_age",    human_age)
+    human_gender = data.get("human_gender", human_gender)
+
+    # --- Scene / setting ---
+    scene_location = data.get("scene_location", scene_location)
+    event_time     = data.get("event_time",     event_time)
+
+    # --- Narrative history ---
+    default_history = data.get(
         "default_history",
         data.get("session_history", default_history),
     )
-
-    # On a fresh load (startup / new-session), seed session_history from the
-    # saved default.  During a running session session_history is managed by
-    # the consolidation prompt and should not be overwritten here — the
-    # caller (reset_session_state) explicitly sets it when needed.
     if not session_history:
         session_history = default_history
 
@@ -231,9 +258,9 @@ def load_config(path: str | None = None) -> dict:
     IMAGE_SIZE_OPTIONS["selected_size"] = data.get(
         "image_size", IMAGE_SIZE_OPTIONS["selected_size"]
     )
-    selected_steps         = data.get("image_steps",    selected_steps)
-    selected_sample_method = data.get("sample_method",  selected_sample_method)
-    selected_cfg_scale     = data.get("cfg_scale",      selected_cfg_scale)
+    selected_steps          = data.get("image_steps",    selected_steps)
+    selected_sample_method  = data.get("sample_method",  selected_sample_method)
+    selected_cfg_scale      = data.get("cfg_scale",      selected_cfg_scale)
     default_negative_prompt = data.get("negative_prompt", default_negative_prompt)
 
     # --- Hardware / threading ---
@@ -242,10 +269,6 @@ def load_config(path: str | None = None) -> dict:
     auto_unload        = data.get("auto_unload",        auto_unload)
     max_memory_percent = data.get("max_memory_percent", max_memory_percent)
 
-    # cpu_threads is the authoritative absolute thread count.
-    # A stored value of 0 means "not yet set" (installer default), so we
-    # fall back to deriving from threads_percent in that case.
-    # Legacy configs that only have threads_percent also use the fallback.
     threads_percent = data.get("threads_percent", threads_percent)
     raw_cpu_threads = data.get("cpu_threads", 0)
     if raw_cpu_threads and raw_cpu_threads > 0:
@@ -253,7 +276,6 @@ def load_config(path: str | None = None) -> dict:
     else:
         cpu_threads = max(1, (CPU_THREADS * threads_percent) // 100)
 
-    # Keep optimal_threads in sync with cpu_threads
     optimal_threads = cpu_threads
 
     print(f"Config loaded from {path}.")
@@ -264,11 +286,26 @@ def save_config(path: str | None = None) -> None:
     """Persist current globals to persistent.json."""
     path = path or CONFIG_PATH
     data = {
-        # --- Conversation / Personalize panel ---
-        "agent_name":      agent_name,
-        "agent_role":      agent_role,
-        "human_name":      human_name,
-        "scene_location":  scene_location,
+        # --- Agent fields ---
+        "agent1_name": agent1_name,
+        "agent1_role": agent1_role,
+
+        "agent2_name": agent2_name,
+        "agent2_role": agent2_role,
+
+        "agent3_name": agent3_name,
+        "agent3_role": agent3_role,
+
+        # --- Human fields ---
+        "human_name":   human_name,
+        "human_age":    human_age,
+        "human_gender": human_gender,
+
+        # --- Scene / setting ---
+        "scene_location": scene_location,
+        "event_time":     event_time,
+
+        # --- Narrative ---
         "default_history": default_history,
 
         # --- Model paths ---
@@ -289,7 +326,7 @@ def save_config(path: str | None = None) -> None:
         "selected_gpu":       selected_gpu,
         "selected_cpu":       selected_cpu,
         "cpu_threads":        cpu_threads,
-        "threads_percent":    threads_percent,    # kept for legacy round-trips
+        "threads_percent":    threads_percent,
         "auto_unload":        auto_unload,
         "max_memory_percent": max_memory_percent,
     }

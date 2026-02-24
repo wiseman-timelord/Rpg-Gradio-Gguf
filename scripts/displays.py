@@ -8,15 +8,23 @@
 # UPDATED: When the image model folder is changed (browse or save),
 # ae.safetensors is automatically copied into the new folder if missing.
 #
-# UPDATED: Chronicler has two modes — Happenings and Visualizer.
-#          Visualizer shows the Generated Image with a Sequence thumbnail
-#          strip beneath it showing all session images (newest first).
-#          Images are ALWAYS generated regardless of Chronicler mode.
-#          "Your Message" input is cleared after the user submits.
-#          Personalize panel uses default_history (saved template) separately
-#          from session_history (running consolidated narrative).
-#          Restore RP Defaults resets to hardcoded installer defaults and saves.
-#          Browser spellcheck context-menu is enabled on all text inputs.
+# LAYOUT (Conversation tab)
+# ─────────────────────────
+# Left column  — "Engagement" radio: Interactions | Happenings | Personalize
+#   • Interactions  : Scenario Log + Your Message + Send
+#   • Happenings    : Consolidated History + Restart Session  (moved from right)
+#   • Personalize   : RP settings form
+#
+# Right column — "Visualizer" radio: No Generation | Z-Image-Turbo
+#   • No Generation  : shows default/last image; skips all image-gen steps
+#   • Z-Image-Turbo  : full pipeline (image prompt → generate image)
+#
+# Image generation is ONLY triggered when the Visualizer is set to
+# "Z-Image-Turbo".  "Your Message" input is cleared after submit.
+# Personalize panel uses default_history (saved template) separately
+# from session_history (running consolidated narrative).
+# Restore RP Defaults resets to hardcoded installer defaults and saves.
+# Browser spellcheck context-menu is enabled on all text inputs.
 
 import os
 import time
@@ -78,18 +86,21 @@ def reset_session():
 
 
 def filter_model_output(raw: str) -> str:
-    """Prefix the agent name if the model didn't already include it."""
+    """Prefix the responding agent name if the model didn't already include it."""
+    name = cfg.agent1_name or "Agent"
     if ":" in raw[:40]:
         _, _, after = raw.partition(":")
-        return f"{cfg.agent_name}: {after.strip()}"
-    return f"{cfg.agent_name}: {raw}"
+        return f"{name}: {after.strip()}"
+    return f"{name}: {raw}"
 
 
 def chat_with_model(user_input: str, right_mode: str):
     """
-    Main conversation loop: converse → consolidate → image_prompt → image.
-    Images are ALWAYS generated regardless of the Chronicler panel mode
-    so users can read Happenings while waiting for image generation.
+    Main conversation loop: converse → consolidate → [image_prompt → image].
+
+    Image generation (steps 3 & 4) is only performed when right_mode is
+    "Z-Image-Turbo".  When right_mode is "No Generation" the pipeline stops
+    after consolidation and keeps the existing latest_image_path on screen.
 
     This is a **generator** — it yields partial updates at each pipeline
     stage so the Gradio UI refreshes progressively instead of blocking
@@ -101,9 +112,9 @@ def chat_with_model(user_input: str, right_mode: str):
     The sequence_gallery list is always newest-first so the most recent
     image appears at the left of the thumbnail strip.
 
-    Image generation runs in a background thread so the generator can
-    poll ``get_image_gen_progress()`` and yield step-by-step status
-    updates to the status bar (e.g. "Generating image, step 3/8…").
+    Image generation (when enabled) runs in a background thread so the
+    generator can poll ``get_image_gen_progress()`` and yield step-by-step
+    status updates to the status bar (e.g. "Generating image, step 3/8…").
     """
     if not user_input.strip():
         yield (
@@ -190,6 +201,20 @@ def chat_with_model(user_input: str, right_mode: str):
     if "error" not in consolidate:
         cfg.session_history = consolidate["agent_response"]
 
+    # ── Image generation — only when Visualizer mode is "Z-Image-Turbo" ──────────
+    if right_mode != "Z-Image-Turbo":
+        # No Generation mode: return after consolidation, keep current image.
+        cfg.user_turn_start_time = time.time()
+        yield (
+            cfg.scenario_log,
+            cfg.session_history,
+            cfg.latest_image_path,
+            "Response generated.",
+            "",
+            list(reversed(cfg.session_image_paths)),
+        )
+        return
+
     # --- Step 3: generate the visual prompt --------------------------------------
     yield (
         cfg.scenario_log,
@@ -267,22 +292,24 @@ def chat_with_model(user_input: str, right_mode: str):
 # Panel switching callbacks
 # -----------------------------------------------------------------------
 def switch_left_panel(mode: str):
-    """Toggle visibility of Interactions vs Personalize panels."""
-    if mode == "Interactions":
-        return gr.update(visible=True), gr.update(visible=False)
-    else:
-        return gr.update(visible=False), gr.update(visible=True)
+    """Toggle visibility of Interactions / Happenings / Personalize panels."""
+    return (
+        gr.update(visible=(mode == "Interactions")),
+        gr.update(visible=(mode == "Happenings")),
+        gr.update(visible=(mode == "Personalize")),
+    )
 
 
 def switch_right_panel_and_state(mode: str):
-    """Toggle visibility of Happenings / Visualizer panels and update state."""
-    happenings_vis = (mode == "Happenings")
-    visualizer_vis = (mode == "Visualizer")
-    return (
-        gr.update(visible=happenings_vis),
-        gr.update(visible=visualizer_vis),
-        mode,
-    )
+    """
+    Update the Visualizer mode state.
+
+    The right column is always the Visualizer (image display); only the
+    generation behaviour changes based on the selected mode.  No panel
+    visibility toggling is required — we just store the state so that
+    chat_with_model knows whether to run image generation.
+    """
+    return mode
 
 
 def on_gallery_select(evt: gr.SelectData):
@@ -301,18 +328,30 @@ def on_gallery_select(evt: gr.SelectData):
 # -----------------------------------------------------------------------
 # Roleplay settings callbacks (Conversation tab — Personalize panel)
 # -----------------------------------------------------------------------
-def save_roleplay_settings(name, role, human, location, history):
-    """Save the roleplay parameters from the Personalize panel.
+def save_roleplay_settings(
+    a1_name, a1_role,
+    a2_name, a2_role,
+    a3_name, a3_role,
+    human, human_age, human_gender,
+    location, event_time, history,
+):
+    """Save the roleplay parameters from the Personalize panel."""
+    cfg.agent1_name = a1_name
+    cfg.agent1_role = a1_role
 
-    *history* is the starting-template ("Default History") which is saved
-    to persistent.json as ``default_history``.  It does NOT overwrite the
-    running consolidated ``session_history``.
-    """
-    cfg.agent_name = name
-    cfg.agent_role = role
-    cfg.human_name = human
-    cfg.scene_location = location
-    cfg.default_history = history       # saved template only
+    cfg.agent2_name = a2_name
+    cfg.agent2_role = a2_role
+
+    cfg.agent3_name = a3_name
+    cfg.agent3_role = a3_role
+
+    cfg.human_name   = human
+    cfg.human_age    = str(human_age) if human_age is not None else ""
+    cfg.human_gender = human_gender
+
+    cfg.scene_location  = location
+    cfg.event_time      = event_time
+    cfg.default_history = history
     cfg.save_config()
     return "RP settings saved."
 
@@ -323,18 +362,30 @@ def restore_roleplay_settings():
     Writes the defaults to both the runtime globals AND persistent.json so
     that subsequent startups also use the defaults.
     """
-    defaults = cfg.DEFAULT_RP_SETTINGS
-    cfg.agent_name    = defaults["agent_name"]
-    cfg.agent_role    = defaults["agent_role"]
-    cfg.human_name    = defaults["human_name"]
-    cfg.scene_location = defaults["scene_location"]
-    cfg.default_history = defaults["default_history"]
+    d = cfg.DEFAULT_RP_SETTINGS
+    cfg.agent1_name = d["agent1_name"]
+    cfg.agent1_role = d["agent1_role"]
+
+    cfg.agent2_name = d["agent2_name"]
+    cfg.agent2_role = d["agent2_role"]
+
+    cfg.agent3_name = d["agent3_name"]
+    cfg.agent3_role = d["agent3_role"]
+
+    cfg.human_name    = d["human_name"]
+    cfg.human_age     = d["human_age"]
+    cfg.human_gender  = d["human_gender"]
+
+    cfg.scene_location = d["scene_location"]
+    cfg.event_time     = d["event_time"]
+    cfg.default_history = d["default_history"]
     cfg.save_config()
     return (
-        cfg.agent_name,
-        cfg.agent_role,
-        cfg.human_name,
-        cfg.scene_location,
+        cfg.agent1_name,   cfg.agent1_role,
+        cfg.agent2_name,   cfg.agent2_role,
+        cfg.agent3_name,   cfg.agent3_role,
+        cfg.human_name,    cfg.human_age,     cfg.human_gender,
+        cfg.scene_location, cfg.event_time,
         cfg.default_history,
         "RP defaults restored and saved.",
     )
@@ -520,20 +571,20 @@ def launch_gradio_interface() -> str | None:
             # ==============================================================
             with gr.Tab("Conversation"):
 
-                # State to track right panel mode for image-skip logic
-                right_panel_state = gr.State("Visualizer")
+                # State to track Visualizer mode for image-generation logic
+                right_panel_state = gr.State("Z-Image-Turbo")
 
                 with gr.Row():
                     # ── LEFT COLUMN ──────────────────────────────────────
                     with gr.Column(scale=1):
                         left_mode = gr.Radio(
-                            choices=["Interactions", "Personalize"],
+                            choices=["Interactions", "Happenings", "Personalize"],
                             value="Interactions",
                             label="Engagement",
                             interactive=True,
                         )
 
-                        # -- Interaction panel --
+                        # -- Interactions panel --
                         with gr.Column(visible=True) as interaction_panel:
                             bot_response = gr.Textbox(
                                 label="Scenario Log",
@@ -548,27 +599,85 @@ def launch_gradio_interface() -> str | None:
                             )
                             send_btn = gr.Button("Send Message")
 
-                        # -- Personalize panel (no header) --
+                        # -- Happenings panel (Consolidated History) --
+                        with gr.Column(visible=False) as happenings_panel:
+                            session_display = gr.Textbox(
+                                label="Consolidated History",
+                                lines=25,
+                                value=cfg.session_history,
+                                interactive=False,
+                            )
+                            reset_btn_happenings = gr.Button(
+                                "Restart Session", variant="primary"
+                            )
+
+                        # -- Personalize panel --
                         with gr.Column(visible=False) as personalize_panel:
-                            rp_agent_name = gr.Textbox(
-                                label="Agent Name",
-                                value=cfg.agent_name,
-                            )
-                            rp_agent_role = gr.Textbox(
-                                label="Agent Role",
-                                value=cfg.agent_role,
-                            )
-                            rp_human_name = gr.Textbox(
-                                label="Human Name",
-                                value=cfg.human_name,
-                            )
-                            rp_scene_location = gr.Textbox(
-                                label="Scene Location",
-                                value=cfg.scene_location,
-                            )
+
+                            # Row 1: Agent Names
+                            with gr.Row():
+                                rp_agent1_name = gr.Textbox(
+                                    label="Agent 1 Name",
+                                    value=cfg.agent1_name,
+                                )
+                                rp_agent2_name = gr.Textbox(
+                                    label="Agent 2 Name",
+                                    value=cfg.agent2_name,
+                                )
+                                rp_agent3_name = gr.Textbox(
+                                    label="Agent 3 Name",
+                                    value=cfg.agent3_name,
+                                )
+
+                            # Row 2: Agent Roles
+                            with gr.Row():
+                                rp_agent1_role = gr.Textbox(
+                                    label="Agent 1 Role",
+                                    value=cfg.agent1_role,
+                                )
+                                rp_agent2_role = gr.Textbox(
+                                    label="Agent 2 Role",
+                                    value=cfg.agent2_role,
+                                )
+                                rp_agent3_role = gr.Textbox(
+                                    label="Agent 3 Role",
+                                    value=cfg.agent3_role,
+                                )
+
+                            # Row 3: Human Name / Age / Gender
+                            with gr.Row():
+                                rp_human_name = gr.Textbox(
+                                    label="Human Name",
+                                    value=cfg.human_name,
+                                )
+                                rp_human_age = gr.Number(
+                                    label="Human Age",
+                                    value=int(cfg.human_age) if cfg.human_age and cfg.human_age.strip().isdigit() else None,
+                                    precision=0,
+                                    minimum=0,
+                                    maximum=999,
+                                )
+                                rp_human_gender = gr.Dropdown(
+                                    label="Human Gender",
+                                    choices=cfg.GENDER_OPTIONS,
+                                    value=cfg.human_gender,
+                                )
+
+                            # Row 5: Scene Location / Event Time
+                            with gr.Row():
+                                rp_scene_location = gr.Textbox(
+                                    label="Scene Location",
+                                    value=cfg.scene_location,
+                                )
+                                rp_event_time = gr.Textbox(
+                                    label="Event Time",
+                                    value=cfg.event_time,
+                                    placeholder="e.g. 16:20, 4:20pm, dawn — leave blank to omit",
+                                )
+
                             rp_default_history = gr.Textbox(
                                 label="Starting Narrative",
-                                value=cfg.default_history,  # Used in only initial prompt.
+                                value=cfg.default_history,
                                 lines=3,
                             )
                             with gr.Row():
@@ -579,55 +688,47 @@ def launch_gradio_interface() -> str | None:
                                     "Restore RP Defaults", variant="stop"
                                 )
 
-                    # ── RIGHT COLUMN ─────────────────────────────────────
+                    # ── RIGHT COLUMN — Visualizer ─────────────────────────
                     with gr.Column(scale=1):
                         right_mode = gr.Radio(
-                            choices=["Happenings", "Visualizer"],
-                            value="Visualizer",
-                            label="Chronicler",
+                            choices=["No Generation", "Z-Image-Turbo"],
+                            value="Z-Image-Turbo",
+                            label="Visualizer",
                             interactive=True,
                         )
 
-                        # -- Happenings panel --
-                        with gr.Column(visible=False) as happenings_panel:
-                            session_display = gr.Textbox(
-                                label="Consolidated History",
-                                lines=25,
-                                value=cfg.session_history,
-                                interactive=False,
-                            )
-                            reset_btn_happenings = gr.Button("Restart Session", variant="primary")
-
-                        # -- Visualizer panel (image + sequence strip) --
-                        with gr.Column(visible=True) as visualizer_panel:
-                            default_img = (
-                                "./data/new_session.jpg"
-                                if os.path.exists("./data/new_session.jpg")
-                                else None
-                            )
-                            generated_image = gr.Image(
-                                label="Generated Image",
-                                type="filepath",
-                                interactive=False,
-                                height=420,
-                                value=default_img,
-                                elem_id="generated_image",
-                            )
-                            # Single-row thumbnail strip — newest image first.
-                            # Height accommodates ~100px thumbnails + label/padding.
-                            # object_fit="contain" scales each thumbnail to fit
-                            # within its cell without cropping.
-                            sequence_gallery = gr.Gallery(
-                                label="Sequence",
-                                columns=8,
-                                rows=1,
-                                height=132,
-                                object_fit="contain",
-                                allow_preview=False,
-                                value=list(reversed(cfg.session_image_paths)),
-                                elem_id="sequence_gallery",
-                            )
-                            reset_btn_visualizer = gr.Button("Restart Session", variant="primary")
+                        # The image display is always visible; only generation
+                        # behaviour changes with the Visualizer mode.
+                        default_img = (
+                            "./data/new_session.jpg"
+                            if os.path.exists("./data/new_session.jpg")
+                            else None
+                        )
+                        generated_image = gr.Image(
+                            label="Generated Image",
+                            type="filepath",
+                            interactive=False,
+                            height=420,
+                            value=default_img,
+                            elem_id="generated_image",
+                        )
+                        # Single-row thumbnail strip — newest image first.
+                        # Height accommodates ~100px thumbnails + label/padding.
+                        # object_fit="contain" scales each thumbnail to fit
+                        # within its cell without cropping.
+                        sequence_gallery = gr.Gallery(
+                            label="Sequence",
+                            columns=8,
+                            rows=1,
+                            height=132,
+                            object_fit="contain",
+                            allow_preview=False,
+                            value=list(reversed(cfg.session_image_paths)),
+                            elem_id="sequence_gallery",
+                        )
+                        reset_btn_visualizer = gr.Button(
+                            "Restart Session", variant="primary"
+                        )
 
                 # ── Status bar + Exit ────────────────────────────────────
                 with gr.Row():
@@ -644,22 +745,18 @@ def launch_gradio_interface() -> str | None:
                         scale=1,
                     )
 
-                # ── Left panel switching ─────────────────────────────────
+                # ── Left panel switching (3 panels) ──────────────────────
                 left_mode.change(
                     fn=switch_left_panel,
                     inputs=left_mode,
-                    outputs=[interaction_panel, personalize_panel],
+                    outputs=[interaction_panel, happenings_panel, personalize_panel],
                 )
 
-                # ── Right panel switching (2 panels) ─────────────────────
+                # ── Right Visualizer mode → update state ─────────────────
                 right_mode.change(
                     fn=switch_right_panel_and_state,
                     inputs=right_mode,
-                    outputs=[
-                        happenings_panel,
-                        visualizer_panel,
-                        right_panel_state,
-                    ],
+                    outputs=right_panel_state,
                 )
 
                 # ── Gallery thumbnail click → show in Generated Image ────
@@ -685,7 +782,7 @@ def launch_gradio_interface() -> str | None:
                     ],
                 )
 
-                # ── Reset session (one button per right panel, both wired the same) ──
+                # ── Reset session (one button per panel, both wired the same) ──
                 _reset_outputs = [
                     session_display,
                     bot_response,
@@ -694,17 +791,22 @@ def launch_gradio_interface() -> str | None:
                     user_input,
                     sequence_gallery,
                 ]
-                reset_btn_happenings.click(fn=reset_session, inputs=[], outputs=_reset_outputs)
-                reset_btn_visualizer.click(fn=reset_session, inputs=[], outputs=_reset_outputs)
+                reset_btn_happenings.click(
+                    fn=reset_session, inputs=[], outputs=_reset_outputs
+                )
+                reset_btn_visualizer.click(
+                    fn=reset_session, inputs=[], outputs=_reset_outputs
+                )
 
                 # ── Save RP settings ─────────────────────────────────────
                 rp_save_btn.click(
                     fn=save_roleplay_settings,
                     inputs=[
-                        rp_agent_name,
-                        rp_agent_role,
-                        rp_human_name,
-                        rp_scene_location,
+                        rp_agent1_name, rp_agent1_role,
+                        rp_agent2_name, rp_agent2_role,
+                        rp_agent3_name, rp_agent3_role,
+                        rp_human_name, rp_human_age, rp_human_gender,
+                        rp_scene_location, rp_event_time,
                         rp_default_history,
                     ],
                     outputs=conv_status,
@@ -715,10 +817,11 @@ def launch_gradio_interface() -> str | None:
                     fn=restore_roleplay_settings,
                     inputs=[],
                     outputs=[
-                        rp_agent_name,
-                        rp_agent_role,
-                        rp_human_name,
-                        rp_scene_location,
+                        rp_agent1_name,   rp_agent1_role,
+                        rp_agent2_name,   rp_agent2_role,
+                        rp_agent3_name,   rp_agent3_role,
+                        rp_human_name,    rp_human_age,     rp_human_gender,
+                        rp_scene_location, rp_event_time,
                         rp_default_history,
                         conv_status,
                     ],

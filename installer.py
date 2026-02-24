@@ -63,15 +63,31 @@ DOWNLOAD_CHUNK_SIZE = 1024 * 512 # 512 KB read chunks
 
 # Default persistent configuration
 # Keys must stay in sync with configure.save_config() / configure.load_config()
-# UPDATED: defaults tuned for Z-Image-Turbo (cfg_scale=1.0, no negatives, 8 steps)
-# UPDATED: "default_history" replaces "session_history"
+# UPDATED: multi-agent support (agent1/2/3), human_age, human_gender, event_time
 DEFAULT_CONFIG = {
-    # --- Conversation / Personalize panel ---
-    "agent_name":      "Wise-Llama",
-    "agent_role":      "A wise oracle who speaks in riddles and metaphors",
-    "human_name":      "Adventurer",
-    "scene_location":  "A misty forest clearing at dawn",
-    "default_history": "The two roleplayers approached one another, and the conversation started.",
+    # --- Agent 1 (primary / responding agent) ---
+    "agent1_name": "Wise-Llama",
+    "agent1_role": "A wise oracle llama",
+
+    # --- Agent 2 ---
+    "agent2_name": "Blue-Bird",
+    "agent2_role": "A bird speaking in songs",
+
+    # --- Agent 3 (inactive by default — blank name disables it) ---
+    "agent3_name": "",
+    "agent3_role": "",
+
+    # --- Human / Player ---
+    "human_name":   "Benevolent-Adventurer",
+    "human_age":    "",
+    "human_gender": "None",
+
+    # --- Scene / Setting ---
+    "scene_location": "A misty forest clearing",
+    "event_time":     "16:20",
+
+    # --- Starting narrative ---
+    "default_history": "The three roleplayers approached one another, and the conversation started.",
 
     # --- Model paths ---
     "text_model_folder":  "./models/text",
@@ -90,7 +106,7 @@ DEFAULT_CONFIG = {
     # --- Hardware / threading ---
     "selected_gpu":       0,
     "selected_cpu":       0,
-    "cpu_threads":        0,      # 0 = derive from threads_percent at first load
+    "cpu_threads":        0,
     "threads_percent":    85,
     "auto_unload":        False,
     "max_memory_percent": 85,

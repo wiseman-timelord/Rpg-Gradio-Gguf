@@ -210,7 +210,8 @@ def load_persistent_settings() -> None:
     # Seed session_history from default_history for the initial session
     cfg.session_history = cfg.default_history
     print(
-        f"  Agent: {cfg.agent_name} | Role: {cfg.agent_role} | "
+        f"  Agent 1: {cfg.agent1_name} | Agent 2: {cfg.agent2_name} | "
+        f"Human: {cfg.human_name} | "
         f"Threads: {cfg.optimal_threads} | VRAM: {cfg.vram_assigned} MB"
     )
 
