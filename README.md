@@ -16,6 +16,10 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 
 ![preview_image](media/interaction_page.jpg)
 
+- The Personalization Panel...
+
+![preview_image](media/personalize_panel.jpg)
+
 - The Configuration Page...
 
 ![preview_image](media/configuration_page.jpg)
