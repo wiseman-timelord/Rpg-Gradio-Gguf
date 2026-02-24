@@ -2,7 +2,7 @@
 - Status: BETA - It works, but not exactly how I want, just yet.
 
 ### Description
-Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf models to simulate limitless roleplaing in a Gradio interface in Web-Browser interface. 
+Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf models to simulate limitless roleplaing in a Gradio interface in Web-Browser interface.
 
 ### FEATURES
 - Gguf Models: Compressed large language models with auto-configuration of model parameters. 
@@ -228,11 +228,10 @@ Here is some info about the modesls...
 ./
 ├── data/
 │   ├── __init__.py            # to mark the directory as a Python package
-│   ├── persistent.json        # Holds default Chatbot configuration
+│   ├── persistent.json        # Holds persistent chatbot configurations.
 ├── venv/                      # Venv local install folder avoiding system conflict.
 │   ├── *                      # Various libraries installed from `./data/requirements.txt`.
-├── logs/                      # (Empty) Will contain any produced log files.
-├── models/                    # (Empty) Directory for, `*.GGUF` and `model_config.json` ,files
+├── models/                    # Defualt directory for model files, though user may specify location. 
 ```
 
  
@@ -243,5 +242,5 @@ The current plan for work featured is...
 - Could do with a new row on the conversation page, to display prompting stages and if the model is loaded and possibly cpu/ram usage.
 
 ## DISCLAIMER:
-- It is advided not to run the scripts in Alpha stage, or unexpected results may occur.
+- It is advided not to run the scripts in Beta stage, and just wait for the full v2 release. The pictures now give a better idea of what to expect.
 - Refer to License.Txt for terms covering usage, distribution, and modifications.
