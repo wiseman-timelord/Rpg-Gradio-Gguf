@@ -205,7 +205,8 @@ Here is some info about the modesls...
 ```
 
 ### Notation
-- Test input: `Hello, you look wise for a llama, are you a wise llama, that knows wise things?`
+- Test input 1: `Hello, you look wise for a llama, are you a wise llama, that knows wise things?`
+- Test input 2: `I seek wisdom, what is the most, wisest and knowledgeable, thing you know of? `
 
 ### File Structure
 - Initial File Structure...
