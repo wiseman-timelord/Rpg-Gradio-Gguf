@@ -11,13 +11,21 @@
 # LAYOUT (Conversation tab)
 # ─────────────────────────
 # Left column  — "Engagement" radio: Interactions | Happenings | Personalize
-#   • Interactions  : Scenario Log + Your Message + Send
-#   • Happenings    : Consolidated History + Restart Session  (moved from right)
+#   • Interactions  : Scenario Log + Your Message + Send / Cancel Response
+#   • Happenings    : Consolidated History  (no Restart button here)
 #   • Personalize   : RP settings form
 #
 # Right column — "Visualizer" radio: No Generation | Z-Image-Turbo
 #   • No Generation  : shows default/last image; skips all image-gen steps
 #   • Z-Image-Turbo  : full pipeline (image prompt → generate image)
+#
+# Status bar row (below both columns):
+#   [Status textbox ............] [Restart Session] [Exit Program]
+#
+# Send/Cancel toggle:
+#   Clicking Send hides the Send button and shows Cancel Response.
+#   Clicking Cancel sets cfg.cancel_processing = True and re-shows Send.
+#   Each inference step in chat_with_model checks the flag before starting.
 #
 # Image generation is ONLY triggered when the Visualizer is set to
 # "Z-Image-Turbo".  "Your Message" input is cleared after submit.
@@ -85,6 +93,24 @@ def reset_session():
     return cfg.session_history, "", placeholder, "Session restarted.", "", []
 
 
+def cancel_response():
+    """
+    Signal the current inference pipeline to abort.
+
+    Sets cfg.cancel_processing = True so that each subsequent call to
+    prompt_response() or generate_image() in the pipeline skips its work.
+    Also restores the Send / Cancel button visibility immediately.
+
+    Returns (status_text, send_btn_update, cancel_btn_update).
+    """
+    cfg.cancel_processing = True
+    return (
+        "Cancelling…",
+        gr.update(visible=True),   # show Send Message
+        gr.update(visible=False),  # hide Cancel Response
+    )
+
+
 def filter_model_output(raw: str) -> str:
     """Prefix the responding agent name if the model didn't already include it."""
     name = cfg.agent1_name or "Agent"
@@ -106,16 +132,33 @@ def chat_with_model(user_input: str, right_mode: str):
     stage so the Gradio UI refreshes progressively instead of blocking
     until the entire pipeline finishes.
 
-    Yields 6 values every iteration:
-        (scenario_log, session_history, image, status, user_input, sequence_gallery)
+    Yields 8 values every iteration:
+        (scenario_log, session_history, image, status,
+         user_input, sequence_gallery, send_btn_update, cancel_btn_update)
 
-    The sequence_gallery list is always newest-first so the most recent
-    image appears at the left of the thumbnail strip.
+    While the pipeline is running the Send button is hidden and the Cancel
+    Response button is visible.  Both are restored before the generator
+    returns so the user can type another message.
 
-    Image generation (when enabled) runs in a background thread so the
-    generator can poll ``get_image_gen_progress()`` and yield step-by-step
-    status updates to the status bar (e.g. "Generating image, step 3/8…").
+    cfg.cancel_processing is reset to False at the start of each call and
+    is set to True by cancel_response() when the user clicks Cancel.  Each
+    inference step checks the flag before starting; if set, remaining steps
+    are skipped and control is returned to the user.
     """
+
+    # Convenience aliases for button update tuples
+    _SEND_HIDDEN   = gr.update(visible=False)
+    _SEND_VISIBLE  = gr.update(visible=True)
+    _CANCEL_HIDDEN = gr.update(visible=False)
+    _CANCEL_VISIBLE = gr.update(visible=True)
+
+    def _restore_buttons():
+        """Return (send_update, cancel_update) that restore the normal state."""
+        return _SEND_VISIBLE, _CANCEL_HIDDEN
+
+    # Reset cancel flag for this new turn
+    cfg.cancel_processing = False
+
     if not user_input.strip():
         yield (
             "Please type a message.",
@@ -124,6 +167,8 @@ def chat_with_model(user_input: str, right_mode: str):
             "Waiting for input...",
             user_input,                  # keep user's text (they typed nothing)
             list(reversed(cfg.session_image_paths)),
+            _SEND_VISIBLE,
+            _CANCEL_HIDDEN,
         )
         return
 
@@ -139,6 +184,8 @@ def chat_with_model(user_input: str, right_mode: str):
             "Loading models… please wait.",
             "",                          # clear input immediately
             list(reversed(cfg.session_image_paths)),
+            _SEND_HIDDEN,
+            _CANCEL_VISIBLE,
         )
         ok, load_msg = ensure_models_loaded()
         if not ok:
@@ -150,6 +197,7 @@ def chat_with_model(user_input: str, right_mode: str):
                 load_msg,
                 "",
                 list(reversed(cfg.session_image_paths)),
+                *_restore_buttons(),
             )
             return
 
@@ -158,7 +206,7 @@ def chat_with_model(user_input: str, right_mode: str):
     # Append the user's line to the running scenario log immediately
     cfg.scenario_log = (cfg.scenario_log + f"\n{cfg.human_name}: {cfg.human_input}").lstrip()
 
-    # Show the user's line right away — and clear the input box
+    # Show the user's line right away — clear the input box — show Cancel
     yield (
         cfg.scenario_log,
         cfg.session_history,
@@ -166,10 +214,27 @@ def chat_with_model(user_input: str, right_mode: str):
         "Generating response…",
         "",                              # clear user input
         list(reversed(cfg.session_image_paths)),
+        _SEND_HIDDEN,
+        _CANCEL_VISIBLE,
     )
 
     # --- Step 1: converse --------------------------------------------------------
     result = prompt_response("converse")
+
+    # Check for cancellation after the blocking call returns
+    if cfg.cancel_processing or result.get("cancelled"):
+        cfg.user_turn_start_time = time.time()
+        yield (
+            cfg.scenario_log,
+            cfg.session_history,
+            cfg.latest_image_path,
+            "Response cancelled.",
+            "",
+            list(reversed(cfg.session_image_paths)),
+            *_restore_buttons(),
+        )
+        return
+
     if "error" in result:
         cfg.user_turn_start_time = time.time()
         yield (
@@ -179,6 +244,7 @@ def chat_with_model(user_input: str, right_mode: str):
             f"Converse error: {result['error']}",
             "",
             list(reversed(cfg.session_image_paths)),
+            *_restore_buttons(),
         )
         return
 
@@ -194,24 +260,27 @@ def chat_with_model(user_input: str, right_mode: str):
         "Generating history…",
         "",
         list(reversed(cfg.session_image_paths)),
+        _SEND_HIDDEN,
+        _CANCEL_VISIBLE,
     )
 
     # --- Step 2: consolidate -----------------------------------------------------
     consolidate = prompt_response("consolidate")
-    if "error" not in consolidate:
+    if not cfg.cancel_processing and not consolidate.get("cancelled") and "error" not in consolidate:
         cfg.session_history = consolidate["agent_response"]
 
     # ── Image generation — only when Visualizer mode is "Z-Image-Turbo" ──────────
-    if right_mode != "Z-Image-Turbo":
-        # No Generation mode: return after consolidation, keep current image.
+    if cfg.cancel_processing or right_mode != "Z-Image-Turbo":
         cfg.user_turn_start_time = time.time()
+        status = "Response cancelled." if cfg.cancel_processing else "Response generated."
         yield (
             cfg.scenario_log,
             cfg.session_history,
             cfg.latest_image_path,
-            "Response generated.",
+            status,
             "",
             list(reversed(cfg.session_image_paths)),
+            *_restore_buttons(),
         )
         return
 
@@ -223,13 +292,29 @@ def chat_with_model(user_input: str, right_mode: str):
         "Generating prompt…",
         "",
         list(reversed(cfg.session_image_paths)),
+        _SEND_HIDDEN,
+        _CANCEL_VISIBLE,
     )
 
     visual_prompt = None
     if cfg.text_model_loaded:
         img_prompt_result = prompt_response("image_prompt")
-        if "agent_response" in img_prompt_result:
-            visual_prompt = img_prompt_result["agent_response"]
+        if not cfg.cancel_processing and not img_prompt_result.get("cancelled"):
+            if "agent_response" in img_prompt_result:
+                visual_prompt = img_prompt_result["agent_response"]
+
+    if cfg.cancel_processing:
+        cfg.user_turn_start_time = time.time()
+        yield (
+            cfg.scenario_log,
+            cfg.session_history,
+            cfg.latest_image_path,
+            "Response cancelled.",
+            "",
+            list(reversed(cfg.session_image_paths)),
+            *_restore_buttons(),
+        )
+        return
 
     if not visual_prompt:
         visual_prompt = f"A scene at {cfg.scene_location}."
@@ -242,6 +327,8 @@ def chat_with_model(user_input: str, right_mode: str):
         "Generating image…",
         "",
         list(reversed(cfg.session_image_paths)),
+        _SEND_HIDDEN,
+        _CANCEL_VISIBLE,
     )
 
     # Run image generation in a background thread so we can poll progress
@@ -254,8 +341,24 @@ def chat_with_model(user_input: str, right_mode: str):
     thread = threading.Thread(target=_worker, daemon=True)
     thread.start()
 
-    # Poll progress and yield status updates every ~1 second
+    # Poll progress and yield status updates every ~1 second.
+    # If cancel is requested, stop polling (the worker thread will check the
+    # flag itself at its next opportunity and return early).
     while not _img_result["done"]:
+        if cfg.cancel_processing:
+            # Wait for the thread to finish cleanly then bail out
+            thread.join()
+            cfg.user_turn_start_time = time.time()
+            yield (
+                cfg.scenario_log,
+                cfg.session_history,
+                cfg.latest_image_path,
+                "Response cancelled.",
+                "",
+                list(reversed(cfg.session_image_paths)),
+                *_restore_buttons(),
+            )
+            return
         step, total = get_image_gen_progress()
         if total > 0 and step > 0:
             status = f"Generating image, step {step}/{total}…"
@@ -268,6 +371,8 @@ def chat_with_model(user_input: str, right_mode: str):
             status,
             "",
             list(reversed(cfg.session_image_paths)),
+            _SEND_HIDDEN,
+            _CANCEL_VISIBLE,
         )
         time.sleep(1.0)
 
@@ -285,6 +390,7 @@ def chat_with_model(user_input: str, right_mode: str):
         "Response generated with image." if image_path else "Response generated (image failed).",
         "",
         list(reversed(cfg.session_image_paths)),
+        *_restore_buttons(),
     )
 
 
@@ -543,11 +649,11 @@ def launch_gradio_interface() -> str | None:
     }
     #sequence_gallery .thumbnail-item,
     #sequence_gallery .thumbnail-lg {
-        /* Fixed thumbnail cells — square, fitting within 132px strip */
-        min-width: 100px !important;
-        max-width: 100px !important;
-        min-height: 100px !important;
-        max-height: 100px !important;
+        /* Fixed thumbnail cells — square, fitting within 188px strip */
+        min-width: 156px !important;
+        max-width: 156px !important;
+        min-height: 156px !important;
+        max-height: 156px !important;
         flex-shrink: 0 !important;
     }
     #sequence_gallery .thumbnail-item img,
@@ -597,7 +703,10 @@ def launch_gradio_interface() -> str | None:
                                 placeholder="Type your message here...",
                                 interactive=True,
                             )
-                            send_btn = gr.Button("Send Message")
+                            send_btn = gr.Button("Send Message", visible=True)
+                            cancel_btn = gr.Button(
+                                "Cancel Response", variant="stop", visible=False
+                            )
 
                         # -- Happenings panel (Consolidated History) --
                         with gr.Column(visible=False) as happenings_panel:
@@ -606,9 +715,6 @@ def launch_gradio_interface() -> str | None:
                                 lines=25,
                                 value=cfg.session_history,
                                 interactive=False,
-                            )
-                            reset_btn_happenings = gr.Button(
-                                "Restart Session", variant="primary"
                             )
 
                         # -- Personalize panel --
@@ -720,17 +826,14 @@ def launch_gradio_interface() -> str | None:
                             label="Sequence",
                             columns=8,
                             rows=1,
-                            height=132,
+                            height=188,
                             object_fit="contain",
                             allow_preview=False,
                             value=list(reversed(cfg.session_image_paths)),
                             elem_id="sequence_gallery",
                         )
-                        reset_btn_visualizer = gr.Button(
-                            "Restart Session", variant="primary"
-                        )
 
-                # ── Status bar + Exit ────────────────────────────────────
+                # ── Status bar + Restart + Exit ──────────────────────────
                 with gr.Row():
                     conv_status = gr.Textbox(
                         value="Ready.",
@@ -739,11 +842,15 @@ def launch_gradio_interface() -> str | None:
                         max_lines=1,
                         scale=20,
                     )
-                    exit_conv = gr.Button(
-                        "Exit Program",
-                        variant="stop",
-                        scale=1,
-                    )
+                    with gr.Column(scale=3, min_width=240):
+                        restart_btn = gr.Button(
+                            "Restart Session",
+                            variant="primary",
+                        )
+                        exit_conv = gr.Button(
+                            "Exit Program",
+                            variant="stop",
+                        )
 
                 # ── Left panel switching (3 panels) ──────────────────────
                 left_mode.change(
@@ -767,8 +874,9 @@ def launch_gradio_interface() -> str | None:
                 )
 
                 # ── Send message ─────────────────────────────────────────
-                # Outputs include user_input (to clear it) and
-                # sequence_gallery (to update the image list).
+                # Outputs include user_input (to clear it),
+                # sequence_gallery (to update the image list), and
+                # send_btn / cancel_btn (to toggle visibility).
                 send_btn.click(
                     fn=chat_with_model,
                     inputs=[user_input, right_panel_state],
@@ -779,10 +887,19 @@ def launch_gradio_interface() -> str | None:
                         conv_status,
                         user_input,
                         sequence_gallery,
+                        send_btn,
+                        cancel_btn,
                     ],
                 )
 
-                # ── Reset session (one button per panel, both wired the same) ──
+                # ── Cancel response ───────────────────────────────────────
+                cancel_btn.click(
+                    fn=cancel_response,
+                    inputs=[],
+                    outputs=[conv_status, send_btn, cancel_btn],
+                )
+
+                # ── Restart Session (status bar button) ──────────────────
                 _reset_outputs = [
                     session_display,
                     bot_response,
@@ -791,10 +908,7 @@ def launch_gradio_interface() -> str | None:
                     user_input,
                     sequence_gallery,
                 ]
-                reset_btn_happenings.click(
-                    fn=reset_session, inputs=[], outputs=_reset_outputs
-                )
-                reset_btn_visualizer.click(
+                restart_btn.click(
                     fn=reset_session, inputs=[], outputs=_reset_outputs
                 )
 
@@ -953,13 +1067,7 @@ def launch_gradio_interface() -> str | None:
                         placeholder="Leave empty for best results with Z-Image-Turbo",
                     )
 
-                # ── Save Settings ─────────────────────────────────────
-                with gr.Row():
-                    save_btn = gr.Button(
-                        "Save Configuration", variant="primary"
-                    )
-
-                # ── Status bar + Exit ────────────────────────────────────
+                # ── Status bar + Save + Exit ─────────────────────────────
                 with gr.Row():
                     cfg_status = gr.Textbox(
                         value="Configuration tab loaded.",
@@ -968,11 +1076,14 @@ def launch_gradio_interface() -> str | None:
                         max_lines=1,
                         scale=20,
                     )
-                    exit_cfg = gr.Button(
-                        "Exit Program",
-                        variant="stop",
-                        scale=1,
-                    )
+                    with gr.Column(scale=3, min_width=240):
+                        save_btn = gr.Button(
+                            "Save Configuration", variant="primary"
+                        )
+                        exit_cfg = gr.Button(
+                            "Exit Program",
+                            variant="stop",
+                        )
 
                 save_btn.click(
                     fn=save_config_tab_settings,

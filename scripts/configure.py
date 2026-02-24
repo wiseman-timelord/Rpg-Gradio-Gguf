@@ -25,6 +25,11 @@ import time
 IDLE_UNLOAD_SECONDS: int = 15 * 60          # 15 minutes
 user_turn_start_time: float | None = None   # None  → not user's turn yet
 
+# Cancel flag — set True by the "Cancel Response" button to abort the
+# current inference pipeline between steps.  Reset to False at the
+# start of every new chat_with_model() call.
+cancel_processing: bool = False
+
 # ---------------------------------------------------------------------------
 # Agent fields  (up to 3 agents; empty/None means agent is inactive)
 # ---------------------------------------------------------------------------

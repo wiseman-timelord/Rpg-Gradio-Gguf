@@ -728,7 +728,13 @@ def prompt_response(task_name: str) -> dict:
 
     If SYSTEM_PROMPTS contains an entry for *task_name*, it is sent as the
     ``system`` role message to Qwen3's chat template.
+
+    Returns {'cancelled': True} immediately if cfg.cancel_processing is set.
     """
+    if cfg.cancel_processing:
+        print(f"[{task_name}] Skipped — cancel requested.")
+        return {"cancelled": True}
+
     settings = cfg.PROMPT_TO_SETTINGS.get(task_name)
     if not settings:
         return {"error": f"No settings for task '{task_name}'."}
@@ -823,6 +829,10 @@ def generate_image(scene_prompt: str | None = None) -> str | None:
     """
     if not cfg.image_model_loaded or cfg.image_model is None:
         print("Image model not loaded, skipping generation.")
+        return None
+
+    if cfg.cancel_processing:
+        print("Image generation skipped — cancel requested.")
         return None
 
     # --- Build a visual prompt ---------------------------------------------------
