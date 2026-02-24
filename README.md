@@ -180,9 +180,9 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 
 ### Models
 Here is some info about the modesls...
-- Text model - This gives you your uncensored RPG brain. Currently: [Qwen3-4B-abliterated-v2-GGUF](https://huggingface.co/mradermacher/Qwen3-4B-abliterated-v2-GGUF). Also considering [Qwen3-4b-Z-Image-Turbo-AbliteratedV1](https://huggingface.co/mradermacher/Qwen3-4b-Z-Image-Turbo-AbliteratedV1-GGUF), this would enable better prompting to image model supposedly.
-- Image model - This enables image generation. Currently: [Z-Image-Turbo-GGUF](https://huggingface.co/vantagewithai/Z-Image-Turbo-GGUF) TBA.
-- SafeTensors - [Link1 ae.safetensors](https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors?download=true) or [Link2 ae.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true)], supposedly we need to download this for Z-Image to work, even though the image generation model are GGUF. 
+- Text model: [Qwen3-4b-Z-Image-Turbo-AbliteratedV1](https://huggingface.co/mradermacher/Qwen3-4b-Z-Image-Turbo-AbliteratedV1-GGUF). This gives you your uncensored RPG brain, and creates quality prompt for image generation.
+- Image model: [Z-Image-Turbo-GGUF](https://huggingface.co/vantagewithai/Z-Image-Turbo-GGUF). This enables image generation.
+- SafeTensors - [Link1 ae.safetensors](https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors?download=true) or [Link2 ae.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true)], this is downloaded by the installer, and automatically copied to same folder as Image model if the the Image model is not in `.\models`. Needs this for Z-Image to work, even though Image model is GGUF. 
 
 ### Usage
 Instructions are for upcoming GPU enhanced version...
