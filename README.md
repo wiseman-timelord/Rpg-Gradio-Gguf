@@ -1,5 +1,5 @@
 # Rpg-Gradio-Gguf
-- Status: ALPHA - Project restart, wait a bit and there will be a working version.
+- Status: BETA - It works, but not exactly how I want, just yet.
 
 ### Description
 Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf models to simulate limitless roleplaing in a Gradio interface in Web-Browser interface. 
@@ -21,7 +21,7 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 ![preview_image](media/configuration_page.jpg)
 
 <details>
-<summary>The installation processes...(ALPHA)</summary>
+<summary>The installation processes...(BETA)</summary>
 
     ```
     ===============================================================================
