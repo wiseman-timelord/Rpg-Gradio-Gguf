@@ -173,10 +173,10 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 ### Requirements
 - Windows - Without proper assessment of the scripts, its Windows 10.
 - Python - Without proper assessment of the scripts, its Python 3.12.
-- LLMs - The model we are using, see Models section.
-- CPU - Any x64 Cpu, scripts use standard llama-cpp-python. 
-- GPU - Vulkan capable GPU Only, it uses vulkan.
-- Internet - Installer requires internet, main program will be offline.  
+- LLMs - For the 2 models we are using, see Models section.
+- CPU - Any x64 Cpu, the more threads the better. Testing was done on 20/24 threads. 
+- GPU - Vulkan capable GPU Only, it uses vulkan. Also install the latest Vulkan SDK, that your GPU/OS supports.
+- Internet - Installer requires internet, main program will be offline. 
 
 ### Models
 Here is some info about the modesls...
@@ -184,15 +184,28 @@ Here is some info about the modesls...
 - Image model: [Z-Image-Turbo-GGUF](https://huggingface.co/vantagewithai/Z-Image-Turbo-GGUF). This enables image generation.
 - SafeTensors - [Link1 ae.safetensors](https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors?download=true) or [Link2 ae.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true)], this is downloaded by the installer, and automatically copied to same folder as Image model if the the Image model is not in `.\models`. Needs this for Z-Image to work, even though Image model is GGUF. 
 
-### Usage
-Instructions are for upcoming GPU enhanced version...
+### Install and Use
+- Instructions for installation...
 ```
-t.b.a
+1. Download the latest release version, and unpack it to a sensible folder. I put it in `C:\Inference_Files\Rpg-Gradio-Gguf`.
+2. Right click the batch and "Run as admin...", then select Install (option 3) from the menu.
+3. Check the install, determine, if you need to install extra things and if there were errors. If you do have errors, check the internet connections and/or feed the output into AI to ask how to make it work.
+4. At the end of the installer press enter to return to the batch menu.
+```
+- Instructions for usage...
+```
+1. Right click the batch and "Run as admin...", then select Install (option 1) from the menu. If this fails then run in debug, and again, if you do have errors, then feed the output into AI to ask how to make it work.
+2. Go to the Configuration page, and setup the, GPU/CPU/Models, then save settings.
+3. Go to the Conversation page, then configure the roleplay through "Personalize" panel mode in "Engagement".
+4. After configuring the rolplay scenario and characters, then return to the Interaction mode on the "Engagement" box, and type your first communication into the "Your Message" box, and click Send Message.
+5. After the response is generated, and the history consolidated, and the prompt created for the image generation, and the image generated, the control will return to the user again, and the user may produce the next communication/actions within the roleplay. 
+6. Step 5 will repeat in a loop, until the user clicks restart session or quits the program, etc. 
+- The user may find their images in a relevantly named folder in ".\output".
+- The user may change details about the roleplay scenario/characters at any point and save, in the Personalize panel.
 ```
 
 ### Notation
 - Test input: `Hello, you look wise for a llama, are you a wise llama, that knows wise things?`
-
 
 ### File Structure
 - Initial File Structure...
