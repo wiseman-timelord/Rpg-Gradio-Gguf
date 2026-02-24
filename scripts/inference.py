@@ -1,8 +1,10 @@
 # scripts/inference.py
 # Model loading, text inference, prompt formatting, and image generation.
 #
-# Text model  : Qwen3-4B-abliterated (GGUF)  via llama-cpp-python  (Vulkan)
-# Image model : WAI-NSFW-Illustrious SDXL     via stable-diffusion-cpp-python (Vulkan)
+# Text model  : Qwen3-4b-Z-Image-Turbo-AbliteratedV1 (GGUF) via llama-cpp-python (Vulkan)
+#               Also serves as the text encoder (llm_path) for image generation.
+# Image model : Z-Image-Turbo (GGUF)  via stable-diffusion-cpp-python (Vulkan)
+#               Requires ae.safetensors VAE in the same folder.
 #
 # GPU SELECTION
 # -------------
@@ -11,6 +13,13 @@
 # GPU the Vulkan backend binds to (same mechanism as CUDA_VISIBLE_DEVICES).
 # We set it from cfg.selected_gpu before each model is initialised so the
 # user's dropdown choice is respected.
+#
+# VRAM STRATEGY
+# -------------
+# The Qwen3 text model (~2.5 GB) and Z-Image-Turbo diffusion model (~4.6 GB)
+# together exceed typical 8 GB VRAM budgets.  compute_vram_allocation() in
+# utilities.py determines how many text-model layers to offload to the GPU
+# and whether the image model should offload its parameters to system RAM.
 
 import os
 import re
@@ -20,8 +29,48 @@ from scripts import configure as cfg
 from scripts.utilities import (
     scan_for_gguf,
     calculate_optimal_threads,
-    estimate_gpu_layers,
+    compute_vram_allocation,
+    ensure_vae_in_image_folder,
 )
+
+
+# -----------------------------------------------------------------------
+# Qwen3 output-cleaning helpers
+# -----------------------------------------------------------------------
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL)
+_METADATA_RE = re.compile(
+    r"\[Technical Metadata\].*",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _strip_think_tags(text: str) -> str:
+    """Remove Qwen3 ``<think>…</think>`` reasoning blocks from output.
+
+    Qwen3 may emit these even in /no_think mode.  The blocks waste tokens
+    and confuse downstream parsing, so we strip them everywhere.
+    """
+    return _THINK_RE.sub("", text).strip()
+
+
+def _clean_image_prompt(raw: str) -> str:
+    """Post-process the Z-Engineer image-prompt output.
+
+    1. Strip ``<think>`` blocks.
+    2. Remove ``[Technical Metadata]`` blocks appended by the model.
+    3. Remove any leading label like ``Enhanced prompt:`` or ``Output:``.
+    4. Collapse whitespace to a single clean paragraph.
+    """
+    text = _strip_think_tags(raw)
+    text = _METADATA_RE.sub("", text).strip()
+    # Remove common preamble labels the model sometimes adds
+    text = re.sub(
+        r"^(Enhanced\s+prompt|Output|Prompt|Result)\s*:\s*",
+        "", text, flags=re.IGNORECASE,
+    )
+    # Collapse to single paragraph
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
 
 # -----------------------------------------------------------------------
@@ -42,6 +91,58 @@ def _apply_gpu_selection() -> None:
     print(f"  GPU selection applied: GGML_VK_VISIBLE_DEVICES={gpu_idx}")
 
 
+def _find_text_model_path() -> str | None:
+    """Return the path to the first .gguf file in the text model folder."""
+    gguf_files = scan_for_gguf(cfg.text_model_folder)
+    return gguf_files[0] if gguf_files else None
+
+
+def _find_image_model_path() -> str | None:
+    """Return the path to the first .gguf file in the image model folder."""
+    gguf_files = scan_for_gguf(cfg.image_model_folder)
+    return gguf_files[0] if gguf_files else None
+
+
+# -----------------------------------------------------------------------
+# Module-level VRAM allocation cache
+# -----------------------------------------------------------------------
+# Computed once when the first model loads, then reused so both models
+# share a consistent plan.  Reset to None when models are unloaded or
+# when settings change (new model folder, new VRAM budget, etc.).
+_vram_plan: dict | None = None
+
+
+def _get_vram_plan() -> dict:
+    """
+    Compute (or return cached) VRAM allocation for both models.
+
+    The plan is computed based on:
+      - cfg.text_model_folder (first .gguf found)
+      - cfg.image_model_folder (first .gguf found)
+      - cfg.vram_assigned
+    """
+    global _vram_plan
+    if _vram_plan is not None:
+        return _vram_plan
+
+    text_path = _find_text_model_path()
+    image_path = _find_image_model_path()
+
+    _vram_plan = compute_vram_allocation(
+        text_model_path=text_path,
+        image_model_path=image_path,
+        vram_budget_mb=cfg.vram_assigned,
+    )
+    print(f"VRAM allocation plan: {_vram_plan['info']}")
+    return _vram_plan
+
+
+def _invalidate_vram_plan() -> None:
+    """Reset the cached VRAM plan so it is recomputed on next load."""
+    global _vram_plan
+    _vram_plan = None
+
+
 # -----------------------------------------------------------------------
 # Model unloading
 # -----------------------------------------------------------------------
@@ -56,6 +157,7 @@ def unload_text_model() -> None:
             print(f"  Warning during text model close: {e}")
         cfg.text_model = None
     cfg.text_model_loaded = False
+    _invalidate_vram_plan()
     import gc
     gc.collect()
     print("Text model unloaded.")
@@ -72,6 +174,7 @@ def unload_image_model() -> None:
             print(f"  Warning during image model close: {e}")
         cfg.image_model = None
     cfg.image_model_loaded = False
+    _invalidate_vram_plan()
     import gc
     gc.collect()
     print("Image model unloaded.")
@@ -120,9 +223,12 @@ def ensure_models_loaded() -> tuple[bool, str]:
 def load_text_model() -> bool:
     """
     Scan cfg.text_model_folder for the first .gguf file and load it via
-    llama-cpp-python (with Vulkan GPU offloading based on cfg.vram_assigned).
+    llama-cpp-python (with Vulkan GPU offloading via smart VRAM allocation).
 
-    Expected model: Qwen3-4B-abliterated Q4_K_M (~2-3 GB)
+    Expected model: Qwen3-4b-Z-Image-Turbo-AbliteratedV1 Q4_K_M (~2.5 GB)
+
+    This model also serves as the text encoder (llm_path) for image
+    generation.  Its path is read again by load_image_model().
     """
     try:
         from llama_cpp import Llama
@@ -130,12 +236,11 @@ def load_text_model() -> bool:
         print("llama-cpp-python is not installed. Text model unavailable.")
         return False
 
-    gguf_files = scan_for_gguf(cfg.text_model_folder)
-    if not gguf_files:
+    model_path = _find_text_model_path()
+    if not model_path:
         print(f"No .gguf text models found in {cfg.text_model_folder}.")
         return False
 
-    model_path = gguf_files[0]
     print(f"Loading text model: {model_path}")
 
     # Apply GPU device selection BEFORE the Vulkan instance is created
@@ -152,7 +257,13 @@ def load_text_model() -> bool:
         print("GGUF metadata parser unavailable; using default n_ctx=2048.")
 
     threads = calculate_optimal_threads(cfg.threads_percent)
-    n_gpu = estimate_gpu_layers(model_path, cfg.vram_assigned)
+
+    # Smart VRAM allocation — accounts for the image model sharing GPU
+    plan = _get_vram_plan()
+    n_gpu = plan["text_gpu_layers"]
+
+    print(f"  Text model GPU layers: {n_gpu} "
+          f"({'all' if n_gpu == -1 else n_gpu})")
 
     try:
         cfg.text_model = Llama(
@@ -177,12 +288,16 @@ def load_text_model() -> bool:
 def load_image_model() -> bool:
     """
     Scan cfg.image_model_folder for the first .gguf file and load it via
-    stable-diffusion-cpp-python.
+    stable-diffusion-cpp-python as a Z-Image-Turbo diffusion model.
 
-    Expected model: waiNSFWIllustrious v14.0 Q8_0 SDXL (~2.7 GB GGUF)
-    - SDXL architecture: use model_path (not diffusion_model_path)
-    - Integrated VAE: no separate vae_path needed
-    - The library auto-detects SD1.x / SD2.x / SDXL from the model file
+    Required files:
+      - Diffusion GGUF:  z_image_turbo-*.gguf  in cfg.image_model_folder
+      - Text encoder:    Qwen3 .gguf           in cfg.text_model_folder  (llm_path)
+      - VAE:             ae.safetensors         in cfg.image_model_folder
+
+    The text encoder is the same Qwen3-4b model used for chat — it doubles
+    as the image model's text encoder because it was specifically
+    fine-tuned for Z-Image-Turbo.
     """
     try:
         from stable_diffusion_cpp import StableDiffusion
@@ -190,57 +305,71 @@ def load_image_model() -> bool:
         print("stable-diffusion-cpp-python is not installed. Image model unavailable.")
         return False
 
-    gguf_files = scan_for_gguf(cfg.image_model_folder)
-    if not gguf_files:
+    # --- Locate the diffusion GGUF -------------------------------------------
+    image_model_path = _find_image_model_path()
+    if not image_model_path:
         print(f"No .gguf image models found in {cfg.image_model_folder}.")
         return False
 
-    model_path = gguf_files[0]
-    print(f"Loading image model: {model_path}")
+    # --- Locate the text encoder (llm_path) ----------------------------------
+    llm_path = _find_text_model_path()
+    if not llm_path:
+        print("No text encoder GGUF found for image model. "
+              "The Qwen3 text model is required as the image encoder (llm_path).")
+        print(f"  Looked in: {cfg.text_model_folder}")
+        return False
+
+    # --- Locate the VAE (ae.safetensors) -------------------------------------
+    vae_path = ensure_vae_in_image_folder(cfg.image_model_folder)
+    if not vae_path:
+        print("ae.safetensors VAE not found. Z-Image-Turbo requires this file.")
+        print("  Re-run the installer (option 3) to download it, or place it "
+              "manually in the image model folder.")
+        return False
+
+    print(f"Loading image model: {image_model_path}")
+    print(f"  Text encoder (llm_path): {llm_path}")
+    print(f"  VAE: {vae_path}")
 
     # Apply GPU device selection BEFORE the Vulkan instance is created
     _apply_gpu_selection()
 
-    # Check for optional separate VAE file in the same folder.
-    # SDXL models sometimes benefit from a fixed FP16 VAE
-    # (e.g. sdxl_vae.safetensors from madebyollin/sdxl-vae-fp16-fix).
-    # If present, pass it; otherwise let the integrated VAE handle it.
-    vae_path = _find_vae_file(cfg.image_model_folder)
-    if vae_path:
-        print(f"  Using separate VAE: {vae_path}")
+    # Smart VRAM allocation
+    plan = _get_vram_plan()
+    offload_cpu = plan["image_offload_cpu"]
+    vae_tiling = plan["image_vae_tiling"]
+
+    print(f"  Image model offload_params_to_cpu={offload_cpu}, "
+          f"vae_tiling={vae_tiling}")
+
+    threads = calculate_optimal_threads(cfg.threads_percent)
 
     try:
         init_kwargs = {
-            "model_path": model_path,
-            # vae_decode_only=True is intentionally omitted — it leaves the VAE
-            # encoder uninitialized in stable-diffusion.cpp, causing a null-ptr
-            # access violation even for txt2img-only use.
+            "diffusion_model_path": image_model_path,
+            "clip_l_path": llm_path,
+            "vae_path": vae_path,
+            "vae_decode_only": True,
+            "vae_tiling": vae_tiling,
+            "n_threads": threads,
         }
-        if vae_path:
-            init_kwargs["vae_path"] = vae_path
+
+        # CPU offload if VRAM is constrained
+        if offload_cpu:
+            init_kwargs["offload_params_to_cpu"] = True
 
         cfg.image_model = StableDiffusion(**init_kwargs)
         cfg.image_model_loaded = True
-        print(f"Image model ready (SDXL via stable-diffusion.cpp, "
+        print(f"Image model ready (Z-Image-Turbo via stable-diffusion.cpp, "
               f"gpu_index={cfg.selected_gpu}).")
         return True
     except Exception as e:
         print(f"Failed to load image model: {e}")
+        print("  Troubleshooting tips:")
+        print("  - Ensure the GGUF is from a compatible source (e.g. leejet repo)")
+        print("  - Ensure ae.safetensors is present in the image model folder")
+        print("  - Ensure the Vulkan SDK is installed")
         return False
-
-
-def _find_vae_file(directory: str) -> str | None:
-    """
-    Look for a VAE file (.safetensors or .gguf containing 'vae' in name)
-    inside the image model folder.  Returns the path or None.
-    """
-    if not os.path.isdir(directory):
-        return None
-    for fname in os.listdir(directory):
-        lower = fname.lower()
-        if "vae" in lower and (lower.endswith(".safetensors") or lower.endswith(".gguf")):
-            return os.path.join(directory, fname)
-    return None
 
 
 # -----------------------------------------------------------------------
@@ -251,17 +380,43 @@ def run_text_inference(
     max_tokens: int = 2000,
     temperature: float = 0.7,
     repeat_penalty: float = 1.1,
+    system_prompt: str | None = None,
 ) -> str:
-    """Send a prompt to the loaded text model and return the generated text."""
+    """Send a prompt to the loaded Qwen3 text model and return the generated text.
+
+    Qwen3-specific handling
+    -----------------------
+    * A ``/no_think`` directive is prepended to the user message so the
+      model skips its chain-of-thought ``<think>`` block.  This avoids
+      wasting tokens on internal reasoning and prevents ``<think>`` tags
+      from leaking into outputs.
+    * An optional *system_prompt* is sent as a ``system`` role message,
+      which Qwen3's chat template places before the user turn.
+    * Any residual ``<think>`` tags are stripped from the response.
+    """
     if not cfg.text_model_loaded or cfg.text_model is None:
         raise RuntimeError("Text model is not loaded.")
 
     try:
-        # Use the chat completion API so the model's instruct template is applied.
-        # Calling raw completion on an instruct-tuned model causes it to echo
-        # instructions rather than respond to them.
+        messages: list[dict] = []
+
+        # System message (optional) — Qwen3 respects this via its Jinja
+        # chat template.  We use /no_think here too for belt-and-suspenders.
+        if system_prompt:
+            messages.append({
+                "role": "system",
+                "content": system_prompt + " /no_think",
+            })
+
+        # User turn — the /no_think soft-switch at the end of the content
+        # tells Qwen3 to skip its reasoning phase for this turn.
+        messages.append({
+            "role": "user",
+            "content": prompt + " /no_think",
+        })
+
         response = cfg.text_model.create_chat_completion(
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             max_tokens=max_tokens,
             temperature=temperature,
             repeat_penalty=repeat_penalty,
@@ -270,12 +425,76 @@ def run_text_inference(
             choices = response.get("choices", [])
             if choices:
                 msg = choices[0].get("message", {})
-                return msg.get("content", "").strip()
+                raw = msg.get("content", "").strip()
+                return _strip_think_tags(raw)
             return "No output from model."
         return "Unexpected response format."
     except Exception as e:
         print(f"Inference error: {e}")
         return f"Error: {e}"
+
+
+# -----------------------------------------------------------------------
+# System prompts (Qwen3 chat-template ``system`` role)
+# -----------------------------------------------------------------------
+# Qwen3 places the system message before the first user turn.  These give
+# the model a strong identity and task framing which dramatically improves
+# output quality for each pipeline stage.
+#
+# The Z-Engineer system prompt is adapted from the official prompt used to
+# fine-tune the Qwen3-4b-Z-Image-Turbo model.  The conversation system
+# prompt leverages Qwen3's excellent roleplay / multi-turn dialogue
+# capabilities.
+
+SYSTEM_PROMPTS: dict[str, str] = {
+    "converse": (
+        "You are a creative roleplay partner. Stay in character at all "
+        "times. Respond with exactly one line of dialogue followed by one "
+        "sentence describing a physical action. Never break character, add "
+        "meta-commentary, or narrate the other character's actions."
+    ),
+    "consolidate": (
+        "You are a concise narrative summariser. Condense roleplay "
+        "conversations into tight third-person prose. Preserve every "
+        "important event, character action, and setting detail. Never "
+        "add events that did not occur."
+    ),
+    "image_prompt": (
+        'You are Z-Engineer, an expert prompt engineering AI specialising '
+        'in the Z-Image Turbo architecture (S3-DiT with Qwen-3 text '
+        'encoder). Your goal is to rewrite scene descriptions into '
+        'high-fidelity "Positive Constraint" prompts optimised for the '
+        '8-step distilled inference process.\n'
+        '\n'
+        'CORE RULES:\n'
+        '1. NO negative language — use Positive Constraints only (e.g. '
+        'instead of "no blur" write "razor-sharp focus, pristine imaging").\n'
+        '2. Natural language sentences — the Qwen-3 encoder requires '
+        'coherent grammar. NEVER use "tag salad" (comma-separated keyword '
+        'lists).\n'
+        '3. Texture density — aggressively describe textures (weathered '
+        'skin, visible pores, fabric weave, film grain) to avoid the '
+        '"plastic" look.\n'
+        '4. Spatial precision — use specific spatial prepositions '
+        '(foreground, midground, background, left, right, camera height, '
+        'gaze direction) to leverage 3D RoPE embeddings.\n'
+        '5. Proper anatomy — for living subjects state "properly formed" '
+        'or "perfectly formed" when describing body parts.\n'
+        '6. Camera & lens — choose a camera and lens that suit the style, '
+        'always using "shot on" or "shot with" phrasing.\n'
+        '\n'
+        'PROMPT STRUCTURE (follow this order):\n'
+        '1. Subject anchoring (WHO / WHAT)\n'
+        '2. Action & context (DOING / WHERE)\n'
+        '3. Aesthetic & lighting (HOW — lighting, atmosphere, colour palette)\n'
+        '4. Technical modifiers (CAMERA — lens, film stock, resolution)\n'
+        '5. Positive constraints (QUALITY — clean background, architectural '
+        'perfection, proper anatomy)\n'
+        '\n'
+        'OUTPUT: Return ONLY the enhanced prompt paragraph (120-180 words). '
+        'Do NOT include any metadata, labels, or explanations.'
+    ),
+}
 
 
 # -----------------------------------------------------------------------
@@ -308,16 +527,22 @@ PROMPT_TEMPLATES: dict[str, str] = {
         "\n"
         "Summary:"
     ),
+    # The image prompt template feeds the current scene to Z-Engineer.
+    # The system prompt (above) carries all the Z-Image-specific rules;
+    # this user message simply provides the scene context and asks for
+    # the enhanced prompt.
     "image_prompt": (
-        "Read the scene description below and produce a single short visual "
-        "prompt (under 30 words) suitable for an anime-style image generator. "
-        "Focus on the setting, lighting, mood, and character poses. "
-        "Do not include character dialogue. Use danbooru-style tags if possible.\n"
+        "Rewrite the following scene description as a single vivid visual "
+        "prompt paragraph (120-180 words) optimised for Z-Image Turbo. "
+        "Describe the setting, lighting, mood, character appearances, "
+        "poses, composition, textures, and camera angle. Use flowing "
+        "natural sentences — no tag lists. Apply all Positive Constraint "
+        "rules.\n"
         "\n"
         "Scene:\n"
         "{session_history}\n"
         "\n"
-        "Visual prompt:"
+        "Enhanced prompt:"
     ),
 }
 
@@ -336,8 +561,12 @@ def format_prompt(task_name: str, data: dict) -> str | None:
 
 
 def parse_agent_response(raw: str) -> str:
-    """Clean up raw model output."""
-    cleaned = raw.strip()
+    """Clean up raw model output.
+
+    Handles Qwen3-specific artefacts (``<think>`` blocks) and general
+    formatting noise (scene headers, runaway multi-paragraph generation).
+    """
+    cleaned = _strip_think_tags(raw).strip()
     cleaned = re.sub(r"^###\s.*:\n", "", cleaned, flags=re.MULTILINE)
     # Take only the first meaningful paragraph to avoid runaway generation
     lines = [l for l in cleaned.split("\n") if l.strip()]
@@ -366,6 +595,9 @@ def prompt_response(task_name: str) -> dict:
     """
     Format the prompt for *task_name*, run inference, and return a dict with
     either {'agent_response': str} or {'error': str}.
+
+    If SYSTEM_PROMPTS contains an entry for *task_name*, it is sent as the
+    ``system`` role message to Qwen3's chat template.
     """
     settings = cfg.PROMPT_TO_SETTINGS.get(task_name)
     if not settings:
@@ -376,34 +608,51 @@ def prompt_response(task_name: str) -> dict:
     if formatted is None:
         return {"error": f"Prompt template for '{task_name}' missing or invalid."}
 
-    print(f"[{task_name}] Sending prompt to model...")
+    # Resolve system prompt (may be None → run_text_inference handles it)
+    sys_prompt = SYSTEM_PROMPTS.get(task_name)
+
+    print(f"[{task_name}] Sending prompt to model"
+          f"{' (with system prompt)' if sys_prompt else ''}...")
 
     raw = run_text_inference(
         formatted,
         max_tokens=settings.get("max_tokens", 2000),
         temperature=settings.get("temperature", 0.7),
         repeat_penalty=settings.get("repeat_penalty", 1.1),
+        system_prompt=sys_prompt,
     )
 
     if raw.startswith("Error:"):
         return {"error": raw}
 
-    parsed = parse_agent_response(raw)
+    # Image prompts need extra cleaning (metadata stripping, etc.)
+    if task_name == "image_prompt":
+        parsed = _clean_image_prompt(raw)
+    else:
+        parsed = parse_agent_response(raw)
+
     print(f"[{task_name}] Response received ({len(parsed)} chars).")
     return {"agent_response": parsed}
 
 
 # -----------------------------------------------------------------------
-# Image generation
+# Image generation  (Z-Image-Turbo)
 # -----------------------------------------------------------------------
 def generate_image(scene_prompt: str | None = None) -> str | None:
     """
-    Generate an image from the current session context using the SDXL model.
+    Generate an image from the current session context using Z-Image-Turbo.
 
     Pipeline:
-    1. If the text model is loaded, distil the session into a visual prompt.
-    2. Call stable-diffusion-cpp-python's generate_image() with SDXL params.
+    1. If the text model is loaded, distil the session into a visual prompt
+       via the "image_prompt" task (recommended for roleplay context).
+    2. Call stable-diffusion-cpp-python's generate_image() with Z-Image params.
     3. Save the resulting PIL image to ./generated/.
+
+    Z-Image-Turbo notes:
+    - Guidance scale should be 0.0 (distilled Turbo model).
+    - Negative prompts are mostly ignored but passed through if set.
+    - Optimised for 8 NFEs (steps).
+    - Resolutions should be multiples of 64.
 
     Returns the saved image path, or None on failure.
     """
@@ -422,23 +671,19 @@ def generate_image(scene_prompt: str | None = None) -> str | None:
         visual_prompt = f"A scene at {cfg.scene_location}."
 
     # --- Parse image dimensions --------------------------------------------------
-    size_str = cfg.IMAGE_SIZE_OPTIONS.get("selected_size", "768x768")
+    size_str = cfg.IMAGE_SIZE_OPTIONS.get("selected_size", "768x1024")
     try:
         width, height = map(int, size_str.split("x")[:2])
     except ValueError:
-        width, height = 768, 768
+        width, height = 768, 1024
 
-    # SDXL uses a VAE with 8x downscaling.  At 256×256 the latent space is
-    # only 32×32, which falls below SDXL's minimum attention resolution and
-    # causes a null-pointer access violation inside stable-diffusion.cpp.
-    # Enforce a safe floor of 512×512; also round to nearest multiple of 64
-    # as required by the SDXL architecture.
+    # Z-Image-Turbo works well from 512 upward; round to nearest multiple of 64.
     MIN_SIZE = 512
     width  = max(MIN_SIZE, (width  // 64) * 64)
     height = max(MIN_SIZE, (height // 64) * 64)
     if width != int(size_str.split("x")[0]) or height != int(size_str.split("x")[1]):
         print(f"  Size adjusted from {size_str} → {width}x{height} "
-              f"(SDXL minimum is {MIN_SIZE}x{MIN_SIZE}; must be multiple of 64).")
+              f"(minimum {MIN_SIZE}x{MIN_SIZE}; must be multiple of 64).")
 
     steps     = cfg.selected_steps if cfg.selected_steps in cfg.STEPS_OPTIONS else 8
     method    = cfg.selected_sample_method
@@ -447,32 +692,39 @@ def generate_image(scene_prompt: str | None = None) -> str | None:
 
     print(f"Generating image: {width}x{height}, {steps} steps, "
           f"cfg={cfg_scale}, method={method}")
-    print(f"  Prompt: {visual_prompt[:120]}")
+    print(f"  Prompt: {visual_prompt[:150]}")
     if negative:
         print(f"  Negative: {negative[:80]}")
 
     try:
-        output_images = cfg.image_model.generate_image(
-            prompt=visual_prompt,
-            negative_prompt=negative,
-            width=width,
-            height=height,
-            sample_steps=steps,
-            sample_method=method,
-            cfg_scale=cfg_scale,
-        )
+        gen_kwargs = {
+            "prompt": visual_prompt,
+            "width": width,
+            "height": height,
+            "sample_steps": steps,
+            "sample_method": method,
+            "cfg_scale": cfg_scale,
+        }
+        # Only pass negative prompt if user provided one
+        if negative:
+            gen_kwargs["negative_prompt"] = negative
+
+        output_images = cfg.image_model.generate_image(**gen_kwargs)
     except TypeError:
-        # Fallback: older versions may use txt_to_img() instead
+        # Fallback: older API versions may use txt_to_img() instead
         try:
-            output_images = cfg.image_model.txt_to_img(
-                prompt=visual_prompt,
-                negative_prompt=negative,
-                width=width,
-                height=height,
-                sample_steps=steps,
-                sample_method=method,
-                cfg_scale=cfg_scale,
-            )
+            gen_kwargs_fallback = {
+                "prompt": visual_prompt,
+                "width": width,
+                "height": height,
+                "sample_steps": steps,
+                "sample_method": method,
+                "cfg_scale": cfg_scale,
+            }
+            if negative:
+                gen_kwargs_fallback["negative_prompt"] = negative
+
+            output_images = cfg.image_model.txt_to_img(**gen_kwargs_fallback)
         except Exception as e:
             print(f"Image generation failed (txt_to_img fallback): {e}")
             return None

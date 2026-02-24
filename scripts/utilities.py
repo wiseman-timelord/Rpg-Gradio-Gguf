@@ -1,13 +1,14 @@
 # scripts/utilities.py
 # General-purpose helper functions.
-# UPDATED: detect_gpus() now enumerates ALL video adapters on Windows via
-# WMIC (primary) and supplements NVIDIA VRAM with nvidia-smi. This ensures
-# secondary / non-primary GPUs (AMD, Intel, etc.) are listed alongside the
-# primary NVIDIA card in the Selected GPU dropdown.
+# UPDATED: Smart dual-model VRAM allocation for Z-Image-Turbo + Qwen3 combo.
+# detect_gpus() enumerates ALL video adapters on Windows via WMIC (primary)
+# and supplements NVIDIA VRAM with nvidia-smi.
 
 import os
+import shutil
 import platform
 import subprocess
+import struct
 from scripts import configure as cfg
 
 
@@ -68,6 +69,200 @@ def browse_folder(current_path: str) -> str:
     return current_path
 
 
+# ---------------------------------------------------------------------------
+# ae.safetensors management
+# ---------------------------------------------------------------------------
+# The installer downloads ae.safetensors to ./models/ae.safetensors.
+# The image model (Z-Image-Turbo) requires it in the same folder as the
+# diffusion GGUF.  ensure_vae_in_image_folder() copies it there if missing.
+
+AE_INSTALLER_PATH = os.path.join(".", "models", "ae.safetensors")
+
+
+def ensure_vae_in_image_folder(image_folder: str) -> str | None:
+    """
+    Ensure ae.safetensors exists in *image_folder*.
+
+    If the file already exists there, return its path immediately.
+    Otherwise, copy it from the installer download location
+    (./models/ae.safetensors).
+
+    Returns the full path to ae.safetensors in the image folder,
+    or None if it could not be provided.
+    """
+    target = os.path.join(image_folder, "ae.safetensors")
+
+    if os.path.isfile(target):
+        print(f"  VAE already present: {target}")
+        return target
+
+    # Try to copy from installer location
+    if os.path.isfile(AE_INSTALLER_PATH):
+        try:
+            os.makedirs(image_folder, exist_ok=True)
+            shutil.copy2(AE_INSTALLER_PATH, target)
+            print(f"  Copied ae.safetensors → {target}")
+            return target
+        except Exception as e:
+            print(f"  Failed to copy ae.safetensors: {e}")
+            return None
+
+    print(f"  WARNING: ae.safetensors not found at {AE_INSTALLER_PATH} or {target}.")
+    print("  Re-run the installer (option 3) to download it.")
+    return None
+
+
+# ---------------------------------------------------------------------------
+# GGUF layer count estimation
+# ---------------------------------------------------------------------------
+
+def _read_gguf_layer_count(model_path: str) -> int | None:
+    """
+    Try to read the number of layers from GGUF metadata.
+
+    Looks for common metadata keys that store layer count:
+      - llama.block_count  (llama-family models)
+      - general.block_count
+
+    Returns the layer count, or None if it cannot be determined.
+    """
+    try:
+        from gguf_parser import GGUFParser
+        parser = GGUFParser(model_path)
+        parser.parse()
+        meta = parser.metadata
+        for key in ("llama.block_count", "general.block_count",
+                     "qwen2.block_count", "block_count"):
+            if key in meta:
+                return int(meta[key])
+    except Exception:
+        pass
+    return None
+
+
+def _estimate_layers_from_size(file_size_mb: float) -> int:
+    """
+    Heuristic: estimate layer count from file size.
+    Based on typical GGUF quant sizes:
+      ~1-2 GB  → ~24-32 layers  (small models)
+      ~2-4 GB  → ~32-40 layers  (4B models)
+      ~4-8 GB  → ~40-60 layers  (7B-14B models)
+    """
+    if file_size_mb < 1500:
+        return 28
+    elif file_size_mb < 3000:
+        return 36
+    elif file_size_mb < 6000:
+        return 48
+    else:
+        return 60
+
+
+# ---------------------------------------------------------------------------
+# Smart dual-model VRAM allocation
+# ---------------------------------------------------------------------------
+
+def compute_vram_allocation(
+    text_model_path: str | None,
+    image_model_path: str | None,
+    vram_budget_mb: int,
+) -> dict:
+    """
+    Compute optimal VRAM allocation for loading BOTH text and image models
+    simultaneously.
+
+    The text model (Qwen3-4B, ~2.5 GB) also serves as the image model's
+    text encoder (llm_path).  The image model (Z-Image-Turbo, ~4.6 GB) is
+    the diffusion backbone.
+
+    Strategy
+    --------
+    1. Measure file sizes as a proxy for full-GPU memory cost.
+    2. Reserve overhead for KV-cache, VAE decode, scratch buffers.
+    3. If both fit entirely → full GPU offload for both.
+    4. If tight → prioritise text model layers (it's used more frequently),
+       enable CPU offload for the image model's heavier params.
+    5. Compute n_gpu_layers for the text model proportionally.
+
+    Returns
+    -------
+    dict with keys:
+        text_gpu_layers : int   (-1 = all, 0 = none, >0 = partial)
+        image_offload_cpu : bool  (True = offload diffusion params to CPU)
+        image_vae_tiling : bool   (True when VRAM is constrained)
+        info : str               (human-readable summary)
+    """
+    OVERHEAD_MB = 600  # KV-cache, VAE, Vulkan context, scratch
+
+    text_size_mb = 0.0
+    image_size_mb = 0.0
+    text_layers = 0
+
+    if text_model_path and os.path.isfile(text_model_path):
+        text_size_mb = os.path.getsize(text_model_path) / (1024 * 1024)
+        text_layers = _read_gguf_layer_count(text_model_path) or \
+                      _estimate_layers_from_size(text_size_mb)
+
+    if image_model_path and os.path.isfile(image_model_path):
+        image_size_mb = os.path.getsize(image_model_path) / (1024 * 1024)
+
+    total_model_mb = text_size_mb + image_size_mb
+    usable_vram = max(0, vram_budget_mb - OVERHEAD_MB)
+
+    info_parts = [
+        f"VRAM budget: {vram_budget_mb} MB, usable: {usable_vram} MB "
+        f"(overhead reserve: {OVERHEAD_MB} MB)",
+        f"Text model: {text_size_mb:.0f} MB, ~{text_layers} layers",
+        f"Image model: {image_size_mb:.0f} MB",
+    ]
+
+    # Case 1: Everything fits comfortably
+    if usable_vram >= total_model_mb * 1.1:
+        info_parts.append("Both models fit in VRAM → full GPU offload.")
+        return {
+            "text_gpu_layers": -1,
+            "image_offload_cpu": False,
+            "image_vae_tiling": False,
+            "info": " | ".join(info_parts),
+        }
+
+    # Case 2: Tight but possible with image CPU offload
+    # With offload_params_to_cpu, the image model uses ~30-40% of its
+    # file size in VRAM (activations + currently-executing layers only).
+    image_offloaded_vram = image_size_mb * 0.35
+    if usable_vram >= text_size_mb + image_offloaded_vram:
+        info_parts.append(
+            "Tight fit → image model offloads params to CPU, "
+            "text model gets full GPU offload."
+        )
+        return {
+            "text_gpu_layers": -1,
+            "image_offload_cpu": True,
+            "image_vae_tiling": True,
+            "info": " | ".join(info_parts),
+        }
+
+    # Case 3: Need to partially offload text model too
+    # Give image model its offloaded share, rest goes to text layers.
+    vram_for_text = max(0, usable_vram - image_offloaded_vram)
+    if text_size_mb > 0 and text_layers > 0:
+        ratio = min(1.0, vram_for_text / text_size_mb)
+        gpu_layers = max(0, int(text_layers * ratio))
+    else:
+        gpu_layers = 0
+
+    info_parts.append(
+        f"Constrained → text model: {gpu_layers}/{text_layers} layers on GPU, "
+        f"image model offloads to CPU, VAE tiling enabled."
+    )
+    return {
+        "text_gpu_layers": gpu_layers,
+        "image_offload_cpu": True,
+        "image_vae_tiling": True,
+        "info": " | ".join(info_parts),
+    }
+
+
 def estimate_gpu_layers(model_path: str, vram_mb: int) -> int:
     """
     Rough heuristic: decide how many layers to offload to the GPU based on
@@ -75,6 +270,10 @@ def estimate_gpu_layers(model_path: str, vram_mb: int) -> int:
 
     Returns -1 (all layers) when the budget comfortably exceeds model size,
     otherwise a proportional layer count.
+
+    NOTE: For dual-model setups, prefer compute_vram_allocation() which
+    accounts for both models sharing the same VRAM.  This function is kept
+    as a simpler fallback for single-model scenarios.
     """
     if not os.path.isfile(model_path):
         return 0
@@ -87,12 +286,14 @@ def estimate_gpu_layers(model_path: str, vram_mb: int) -> int:
         print(f"VRAM budget ({vram_mb} MB) covers model ({file_size_mb:.0f} MB). Full GPU offload.")
         return -1  # offload everything
 
-    # Conservative proportional estimate assuming ~60 layers for a 14B model
-    estimated_layers = 60
+    # Use actual or estimated layer count
+    layers = _read_gguf_layer_count(model_path) or \
+             _estimate_layers_from_size(file_size_mb)
     ratio = usable_vram / max(file_size_mb, 1)
-    layers = max(0, int(estimated_layers * ratio))
-    print(f"VRAM budget ({vram_mb} MB) < model ({file_size_mb:.0f} MB). Offloading ~{layers} layers.")
-    return layers
+    gpu_layers = max(0, int(layers * ratio))
+    print(f"VRAM budget ({vram_mb} MB) < model ({file_size_mb:.0f} MB). "
+          f"Offloading ~{gpu_layers}/{layers} layers.")
+    return gpu_layers
 
 
 # ---------------------------------------------------------------------------

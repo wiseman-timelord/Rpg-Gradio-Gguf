@@ -1,5 +1,12 @@
 # scripts/configure.py
 # Central configuration: runtime globals, option lists, JSON persistence.
+#
+# UPDATED for Z-Image-Turbo + Qwen3-4b-Z-Image-Turbo-AbliteratedV1:
+#   - cfg_scale default → 0.0 (Turbo/distilled models use guidance 0)
+#   - Negative prompt default → "" (Z-Image-Turbo ignores negatives)
+#   - Steps default → 8 (Turbo is optimised for 8 NFEs)
+#   - Sample method default → "euler" (stable for Z-Image-Turbo)
+#   - Image sizes include larger options suitable for Z-Image
 
 import os
 import json
@@ -75,38 +82,37 @@ vram_assigned: int = 8192
 VRAM_OPTIONS: list[int] = [2048, 4096, 6144, 8192, 10240, 12288, 16384, 24576]
 
 # ---------------------------------------------------------------------------
-# Image generation options
+# Image generation options  (tuned for Z-Image-Turbo)
 # ---------------------------------------------------------------------------
-# SDXL-appropriate sizes — native resolution is 1024x1024 but smaller
-# sizes are provided for faster generation on limited hardware.
+# Z-Image-Turbo supports a wide range of resolutions.  Multiples of 64.
+# It works well at 512-1024 range; 768x1024 is a sweet spot for portraits.
 IMAGE_SIZE_OPTIONS: dict = {
     "available_sizes": [
         "512x512",
         "512x768", "768x512", "768x768",
         "768x1024", "1024x768", "1024x1024",
     ],
-    "selected_size": "512x512",
+    "selected_size": "768x1024",
 }
 
-STEPS_OPTIONS: list[int] = [2, 4, 6, 8, 10, 15, 20, 25, 30]
+# Z-Image-Turbo is a distilled model optimised for low step counts (8 NFEs).
+STEPS_OPTIONS: list[int] = [4, 6, 8, 10, 12, 15, 20]
 selected_steps: int = 8
 
 SAMPLE_METHOD_OPTIONS: list[str] = [
     "euler", "euler_a", "heun", "dpm2",
     "dpm++2s_a", "dpm++2m", "dpm++2mv2", "lcm",
 ]
-selected_sample_method: str = "euler_a"
+selected_sample_method: str = "euler"
 
-# CFG scale — how strongly the image follows the prompt.
-# SDXL typically uses 5–7 for best results.
-CFG_SCALE_OPTIONS: list[float] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0]
-selected_cfg_scale: float = 5.0
+# CFG scale — Z-Image-Turbo (distilled/Turbo models) should use 0.0.
+# Higher values are kept as options for experimentation.
+CFG_SCALE_OPTIONS: list[float] = [0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 7.0]
+selected_cfg_scale: float = 0.0
 
-# Default negative prompt for image generation (SDXL benefits from this)
-default_negative_prompt: str = (
-    "low quality, blurry, distorted, deformed, ugly, bad anatomy, "
-    "watermark, text, signature"
-)
+# Z-Image-Turbo mostly ignores negative prompts, so default is empty.
+# Users can still enter one for experimentation.
+default_negative_prompt: str = ""
 
 # ---------------------------------------------------------------------------
 # Prompt-to-inference-settings map
@@ -125,7 +131,7 @@ PROMPT_TO_SETTINGS: dict = {
     "image_prompt": {
         "temperature": 0.6,
         "repeat_penalty": 1.0,
-        "max_tokens": 80,
+        "max_tokens": 350,
     },
 }
 

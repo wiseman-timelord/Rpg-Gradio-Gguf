@@ -1,6 +1,11 @@
 # installer.py
 # Standalone installer for Rpg-Gradio-Gguf
 # Run with system Python: python installer.py
+#
+# UPDATED for Z-Image-Turbo + Qwen3-4b-Z-Image-Turbo-AbliteratedV1:
+#   - Downloads ae.safetensors VAE (~350 MB) required by Z-Image-Turbo
+#   - Updated default config for Z-Image-Turbo parameters
+#   - Updated model download instructions in summary
 
 import subprocess
 import sys
@@ -39,6 +44,15 @@ VULKAN_BIN_URL = (
 VULKAN_BIN_DIR = os.path.join(".", "data", "llama_cpp-vulkan")
 VULKAN_ZIP_PATH = os.path.join(".", "data", "llama_cpp_vulkan.zip")
 
+# ae.safetensors VAE required by Z-Image-Turbo
+# Primary: Comfy-Org mirror (smaller, more reliable)
+# Fallback: Black Forest Labs original
+AE_SAFETENSORS_URLS = [
+    "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors",
+    "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors",
+]
+AE_SAFETENSORS_PATH = os.path.join(".", "models", "ae.safetensors")
+
 # Download settings
 DOWNLOAD_MAX_RETRIES = 10        # Max resume attempts before giving up
 DOWNLOAD_RETRY_DELAY = 5         # Seconds to wait between retries
@@ -46,6 +60,7 @@ DOWNLOAD_CHUNK_SIZE = 1024 * 512 # 512 KB read chunks
 
 # Default persistent configuration
 # Keys must stay in sync with configure.save_config() / configure.load_config()
+# UPDATED: defaults tuned for Z-Image-Turbo (cfg_scale=0, no negatives, 8 steps)
 DEFAULT_CONFIG = {
     # --- Conversation / Personalize panel ---
     "agent_name":      "Wise-Llama",
@@ -61,15 +76,12 @@ DEFAULT_CONFIG = {
     # --- VRAM budget ---
     "vram_assigned": 8192,
 
-    # --- Image generation settings ---
-    "image_size":      "768x768",
+    # --- Image generation settings (Z-Image-Turbo) ---
+    "image_size":      "768x1024",
     "image_steps":     8,
-    "sample_method":   "euler_a",
-    "cfg_scale":       5.0,
-    "negative_prompt": (
-        "low quality, blurry, distorted, deformed, ugly, bad anatomy, "
-        "watermark, text, signature"
-    ),
+    "sample_method":   "euler",
+    "cfg_scale":       0.0,
+    "negative_prompt": "",
 
     # --- Hardware / threading ---
     "selected_gpu":       0,
@@ -188,7 +200,7 @@ def download_with_resume(url, dest_path, max_retries=DOWNLOAD_MAX_RETRIES,
 # Steps
 # ---------------------------------------------------------------------------
 def step_create_directories():
-    print("\n[1/5] Creating directory structure...")
+    print("\n[1/6] Creating directory structure...")
     for d in ["data", "models", "models/text", "models/image",
               "scripts", "generated", "logs"]:
         ensure_directory(os.path.join(".", d))
@@ -196,7 +208,7 @@ def step_create_directories():
 
 
 def step_create_venv():
-    print("\n[2/5] Creating virtual environment...")
+    print("\n[2/6] Creating virtual environment...")
     venv_dir = os.path.join(".", "venv")
     if os.path.exists(os.path.join(venv_dir, "Scripts", "python.exe")):
         print("  Virtual environment already exists, skipping creation.")
@@ -208,7 +220,7 @@ def step_create_venv():
 
 
 def step_install_packages():
-    print("\n[3/5] Installing Python packages into venv...")
+    print("\n[3/6] Installing Python packages into venv...")
     # Use python.exe -m pip rather than pip.exe directly.
     # Calling pip.exe to upgrade itself causes a file-lock error on Windows
     # because pip cannot replace its own running executable.
@@ -277,7 +289,7 @@ def step_install_packages():
 
 
 def step_download_vulkan_binaries():
-    print("\n[4/5] Downloading llama.cpp Vulkan binaries...")
+    print("\n[4/6] Downloading llama.cpp Vulkan binaries...")
     if os.path.isdir(VULKAN_BIN_DIR) and os.listdir(VULKAN_BIN_DIR):
         print("  Vulkan binaries already present, skipping download.")
         return True
@@ -313,8 +325,59 @@ def step_download_vulkan_binaries():
     return True
 
 
+def step_download_vae():
+    """
+    Download ae.safetensors (~350 MB) required by Z-Image-Turbo.
+
+    The file is saved to ./models/ae.safetensors.  When the user sets
+    an image model folder in the program, it is automatically copied
+    there if not already present.
+
+    Tries the primary URL first, falls back to the secondary if needed.
+    Supports resume for interrupted downloads.
+    """
+    print("\n[5/6] Downloading ae.safetensors (VAE for Z-Image-Turbo)...")
+
+    if os.path.isfile(AE_SAFETENSORS_PATH):
+        file_size = os.path.getsize(AE_SAFETENSORS_PATH)
+        # A valid ae.safetensors should be roughly 300-400 MB.
+        # If the file is very small, it's probably a failed/partial download.
+        if file_size > 100 * 1024 * 1024:  # > 100 MB
+            print(f"  ae.safetensors already present ({file_size / (1024*1024):.0f} MB), "
+                  "skipping download.")
+            return True
+        else:
+            print(f"  Existing file is only {file_size:,} bytes (likely incomplete). "
+                  "Re-downloading...")
+            os.remove(AE_SAFETENSORS_PATH)
+
+    ensure_directory(os.path.dirname(AE_SAFETENSORS_PATH))
+
+    for i, url in enumerate(AE_SAFETENSORS_URLS):
+        source_label = "primary" if i == 0 else "fallback"
+        print(f"  Trying {source_label} source: {url}")
+        print("  ~350 MB — will resume automatically if the connection drops.")
+
+        success = download_with_resume(url, AE_SAFETENSORS_PATH)
+        if success:
+            final_size = os.path.getsize(AE_SAFETENSORS_PATH)
+            print(f"  ae.safetensors downloaded successfully ({final_size / (1024*1024):.0f} MB).")
+            return True
+
+        # Clean up failed attempt before trying fallback
+        if os.path.exists(AE_SAFETENSORS_PATH):
+            os.remove(AE_SAFETENSORS_PATH)
+        print(f"  {source_label.capitalize()} source failed.")
+
+    print("  !! ae.safetensors download failed from all sources.")
+    print("  You can manually download it from:")
+    print("    https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors")
+    print(f"  and place it at: {os.path.abspath(AE_SAFETENSORS_PATH)}")
+    return False
+
+
 def step_create_default_config():
-    print("\n[5/5] Creating default configuration and assets...")
+    print("\n[6/6] Creating default configuration and assets...")
     config_path = os.path.join(".", "data", "persistent.json")
     if os.path.exists(config_path):
         print(f"  Config already exists: {config_path}")
@@ -351,6 +414,7 @@ def main():
         ("Virtual Environment",   step_create_venv),
         ("Python Packages",       step_install_packages),
         ("Vulkan Binaries",       step_download_vulkan_binaries),
+        ("VAE (ae.safetensors)",  step_download_vae),
         ("Config & Assets",       step_create_default_config),
     ]
 
@@ -382,8 +446,13 @@ def main():
         print()
         print("  MODELS TO DOWNLOAD:")
         print("  ---")
-        print("  Text:  Qwen3-4B-abliterated Q4_K_M .gguf  -> ./models/text/")
-        print("  Image: waiNSFWIllustrious v14.0 Q8_0 .gguf -> ./models/image/")
+        print("  Text:  Qwen3-4b-Z-Image-Turbo-AbliteratedV1.Q4_K_M.gguf")
+        print("         -> ./models/text/")
+        print("         (also serves as image encoder)")
+        print()
+        print("  Image: z_image_turbo-Q4_0.gguf")
+        print("         -> ./models/image/")
+        print("         (ae.safetensors auto-copied here on first use)")
         print("  ---")
         print("  Then launch from the batch menu (option 1 or 2).")
     else:

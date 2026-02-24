@@ -4,13 +4,22 @@
 # The Gradio server always starts non-blocking and returns a local URL.
 # launcher.py is responsible for opening the pywebview window that points
 # at this URL, and for the shutdown/exit lifecycle.
+#
+# UPDATED: When the image model folder is changed (browse or save),
+# ae.safetensors is automatically copied into the new folder if missing.
 
 import os
 import time
 import gradio as gr
 
 from scripts import configure as cfg
-from scripts.utilities import reset_session_state, browse_folder, detect_gpus, detect_cpus
+from scripts.utilities import (
+    reset_session_state,
+    browse_folder,
+    detect_gpus,
+    detect_cpus,
+    ensure_vae_in_image_folder,
+)
 from scripts.inference import prompt_response, generate_image, ensure_models_loaded
 
 
@@ -187,7 +196,11 @@ def save_config_tab_settings(
     img_sz, steps, samp, cfgs, neg, tf, imf,
 ):
     """Save all Configuration-tab fields.  Roleplay values stay in sync
-    via the Personalize panel on the Conversation tab."""
+    via the Personalize panel on the Conversation tab.
+
+    When the image model folder changes, ae.safetensors is automatically
+    copied into the new folder if it is not already present.
+    """
 
     # Parse GPU index from dropdown string  "GPU0: Name (VRAM MB)"
     try:
@@ -214,9 +227,21 @@ def save_config_tab_settings(
     cfg.selected_cfg_scale = float(cfgs)
     cfg.default_negative_prompt = neg
     cfg.text_model_folder = tf
+
+    # --- Image model folder: auto-copy ae.safetensors if needed ---
+    old_image_folder = cfg.image_model_folder
     cfg.image_model_folder = imf
+
+    vae_status = ""
+    if imf and os.path.isdir(imf):
+        vae_result = ensure_vae_in_image_folder(imf)
+        if vae_result:
+            vae_status = " ae.safetensors confirmed."
+        else:
+            vae_status = " WARNING: ae.safetensors missing — re-run installer."
+
     cfg.save_config()
-    return "Configuration saved."
+    return f"Configuration saved.{vae_status}"
 
 
 def browse_text_folder(current: str) -> str:
@@ -224,7 +249,19 @@ def browse_text_folder(current: str) -> str:
 
 
 def browse_image_folder(current: str) -> str:
-    return browse_folder(current)
+    """
+    Open folder picker for the image model folder.
+    After selection, automatically ensure ae.safetensors is present.
+    """
+    chosen = browse_folder(current)
+    if chosen and os.path.isdir(chosen):
+        vae = ensure_vae_in_image_folder(chosen)
+        if vae:
+            print(f"ae.safetensors ready in {chosen}")
+        else:
+            print(f"WARNING: ae.safetensors could not be placed in {chosen}. "
+                  "Re-run the installer to download it.")
+    return chosen
 
 
 # -----------------------------------------------------------------------
@@ -479,7 +516,7 @@ def launch_gradio_interface() -> str | None:
                             choices=vram_options_str,
                             value=str(valid_vram),
                             label="VRAM Allocation (MB)",
-                            info="Select VRAM to use for model layers. GPU layers auto-calculated.",
+                            info="VRAM budget for both text + image models. Layers auto-calculated.",
                             interactive=True,
                         )
                     with gr.Row():
@@ -528,6 +565,11 @@ def launch_gradio_interface() -> str | None:
                     )
                     image_browse_btn = gr.Button("Browse...", scale=1)
 
+                gr.Markdown(
+                    "*Text model (Qwen3-4b) also serves as the image encoder. "
+                    "ae.safetensors is auto-copied to the image folder when set.*",
+                )
+
                 text_browse_btn.click(
                     fn=browse_text_folder,
                     inputs=text_folder_in,
@@ -541,7 +583,7 @@ def launch_gradio_interface() -> str | None:
 
                 # ── IMAGE GENERATION ─────────────────────────────────────
                 with gr.Group():
-                    gr.Markdown("### Image Generation")
+                    gr.Markdown("### Image Generation (Z-Image-Turbo)")
                     with gr.Row():
                         image_size_dd = gr.Dropdown(
                             label="Image Size",
@@ -554,6 +596,7 @@ def launch_gradio_interface() -> str | None:
                             choices=[str(s) for s in cfg.STEPS_OPTIONS],
                             value=str(cfg.selected_steps),
                             type="value",
+                            info="Z-Image-Turbo is optimised for 8 steps.",
                         )
                         sample_dd = gr.Dropdown(
                             label="Sample Method",
@@ -562,15 +605,17 @@ def launch_gradio_interface() -> str | None:
                             type="value",
                         )
                         cfg_scale_dd = gr.Dropdown(
-                            label="CFG Scale (prompt strength)",
+                            label="CFG Scale",
                             choices=[str(c) for c in cfg.CFG_SCALE_OPTIONS],
                             value=str(cfg.selected_cfg_scale),
                             type="value",
+                            info="Use 0.0 for Turbo models. Higher = stronger prompt adherence.",
                         )
                     negative_prompt_in = gr.Textbox(
-                        label="Negative Prompt (things to avoid in images)",
+                        label="Negative Prompt (Z-Image-Turbo mostly ignores this)",
                         value=cfg.default_negative_prompt,
                         lines=2,
+                        placeholder="Leave empty for best results with Z-Image-Turbo",
                     )
 
                 # ── Save Settings ─────────────────────────────────────
