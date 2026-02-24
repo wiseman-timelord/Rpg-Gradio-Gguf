@@ -2,11 +2,17 @@
 # Central configuration: runtime globals, option lists, JSON persistence.
 #
 # UPDATED for Z-Image-Turbo + Qwen3-4b-Z-Image-Turbo-AbliteratedV1:
-#   - cfg_scale default → 0.0 (Turbo/distilled models use guidance 0)
+#   - cfg_scale default → 1.0 (sd.cpp distilled models need cfg=1.0;
+#     0.0 triggers unconditioned mode which ignores the prompt entirely)
 #   - Negative prompt default → "" (Z-Image-Turbo ignores negatives)
 #   - Steps default → 8 (Turbo is optimised for 8 NFEs)
 #   - Sample method default → "euler" (stable for Z-Image-Turbo)
 #   - Image sizes include larger options suitable for Z-Image
+#
+# UPDATED: default_history / session_history separation
+#   - default_history  → the starting-point template saved in JSON / Personalize
+#   - session_history   → the running consolidated narrative (mutated each turn)
+#   - Session image tracking and per-session output folders
 
 import os
 import json
@@ -29,12 +35,27 @@ agent_name: str = "Wise-Llama"
 agent_role: str = "A wise oracle who speaks in riddles and metaphors"
 human_name: str = "Adventurer"
 scene_location: str = "A misty forest clearing at dawn"
-session_history: str = "The conversation started."
+
+# default_history is the starting-point template.  It is saved to / loaded
+# from persistent.json and shown in the "Default History" box on the
+# Personalize panel.  It is NOT mutated during conversation.
+default_history: str = (
+    "The two roleplayers approached one another, and the conversation started."
+)
+
+# session_history is the running consolidated narrative.  Each turn the
+# consolidation prompt rewrites it.  Shown in "Consolidated History".
+session_history: str = ""
+
 scenario_log: str = ""   # Running per-session dialogue log shown in Scenario Log box
 human_input: str = ""
 agent_output: str = ""
 rotation_counter: int = 0
 latest_image_path: str | None = None
+
+# Per-session image tracking  (for Sequence panel in Chronicler)
+session_image_paths: list[str] = []    # all images generated this session
+session_folder: str | None = None      # e.g. "./output/misty_forest_cle"
 
 # ---------------------------------------------------------------------------
 # Shutdown callback — set by launcher.py at startup.
@@ -107,8 +128,8 @@ selected_sample_method: str = "euler"
 
 # CFG scale — Z-Image-Turbo (distilled/Turbo models) should use 0.0.
 # Higher values are kept as options for experimentation.
-CFG_SCALE_OPTIONS: list[float] = [0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 7.0]
-selected_cfg_scale: float = 0.0
+CFG_SCALE_OPTIONS: list[float] = [1.0, 1.5, 2.0, 3.0, 5.0, 7.0]
+selected_cfg_scale: float = 1.0
 
 # Z-Image-Turbo mostly ignores negative prompts, so default is empty.
 # Users can still enter one for experimentation.
@@ -136,6 +157,21 @@ PROMPT_TO_SETTINGS: dict = {
 }
 
 # ---------------------------------------------------------------------------
+# Default RP settings — used by "Restore RP Defaults" to reset to
+# the values the installer would have written to persistent.json.
+# ---------------------------------------------------------------------------
+DEFAULT_RP_SETTINGS: dict = {
+    "agent_name":     "Wise-Llama",
+    "agent_role":     "A wise oracle who speaks in riddles and metaphors",
+    "human_name":     "Adventurer",
+    "scene_location": "A misty forest clearing at dawn",
+    "default_history": (
+        "The two roleplayers approached one another, "
+        "and the conversation started."
+    ),
+}
+
+# ---------------------------------------------------------------------------
 # JSON persistence helpers
 # ---------------------------------------------------------------------------
 CONFIG_PATH = os.path.join(".", "data", "persistent.json")
@@ -143,7 +179,8 @@ CONFIG_PATH = os.path.join(".", "data", "persistent.json")
 
 def load_config(path: str | None = None) -> dict:
     """Load persistent.json and update module-level globals. Returns the dict."""
-    global agent_name, agent_role, human_name, scene_location, session_history
+    global agent_name, agent_role, human_name, scene_location
+    global default_history, session_history
     global threads_percent, optimal_threads, cpu_threads
     global selected_gpu, selected_cpu, auto_unload, max_memory_percent
     global text_model_folder, image_model_folder, vram_assigned
@@ -167,7 +204,20 @@ def load_config(path: str | None = None) -> dict:
     agent_role       = data.get("agent_role",       agent_role)
     human_name       = data.get("human_name",       human_name)
     scene_location   = data.get("scene_location",   scene_location)
-    session_history  = data.get("session_history",  session_history)
+
+    # default_history is the saved starting template.
+    # Legacy configs may still use the old "session_history" key.
+    default_history  = data.get(
+        "default_history",
+        data.get("session_history", default_history),
+    )
+
+    # On a fresh load (startup / new-session), seed session_history from the
+    # saved default.  During a running session session_history is managed by
+    # the consolidation prompt and should not be overwritten here — the
+    # caller (reset_session_state) explicitly sets it when needed.
+    if not session_history:
+        session_history = default_history
 
     # --- Model paths ---
     text_model_folder  = data.get("text_model_folder",  text_model_folder)
@@ -218,7 +268,7 @@ def save_config(path: str | None = None) -> None:
         "agent_role":      agent_role,
         "human_name":      human_name,
         "scene_location":  scene_location,
-        "session_history": session_history,
+        "default_history": default_history,
 
         # --- Model paths ---
         "text_model_folder":  text_model_folder,

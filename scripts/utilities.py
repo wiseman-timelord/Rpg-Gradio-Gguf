@@ -3,8 +3,11 @@
 # UPDATED: Smart dual-model VRAM allocation for Z-Image-Turbo + Qwen3 combo.
 # detect_gpus() enumerates ALL video adapters on Windows via WMIC (primary)
 # and supplements NVIDIA VRAM with nvidia-smi.
+#
+# UPDATED: Per-session output folders in ./output with keyword-derived names.
 
 import os
+import re
 import shutil
 import platform
 import subprocess
@@ -20,14 +23,115 @@ def calculate_optimal_threads(percent: int = 80) -> int:
     return threads
 
 
+# ---------------------------------------------------------------------------
+# Session folder naming
+# ---------------------------------------------------------------------------
+# Stop words excluded when extracting keywords from the session history.
+_STOP_WORDS: set[str] = {
+    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
+    "of", "is", "it", "was", "were", "are", "be", "been", "being", "have",
+    "has", "had", "do", "does", "did", "will", "would", "shall", "should",
+    "may", "might", "can", "could", "not", "no", "so", "if", "then", "than",
+    "that", "this", "these", "those", "with", "from", "by", "as", "into",
+    "about", "up", "out", "off", "over", "under", "between", "through",
+    "after", "before", "during", "its", "their", "his", "her", "my", "your",
+    "our", "he", "she", "they", "we", "you", "i", "me", "him", "us", "them",
+    "what", "which", "who", "whom", "how", "when", "where", "why",
+    "just", "also", "very", "too", "each", "every", "all", "some", "any",
+    "two", "one", "started", "conversation", "roleplayers", "approached",
+    "another", "said", "says", "told", "asked",
+}
+
+
+def _extract_keywords(text: str, max_keywords: int = 4) -> list[str]:
+    """
+    Extract the most meaningful words from *text* for folder naming.
+
+    Uses simple frequency-weighted keyword extraction:
+    1. Tokenise to lowercase alpha words.
+    2. Remove stop words and very short words.
+    3. Return the most frequent remaining words (up to *max_keywords*).
+    """
+    words = re.findall(r"[a-zA-Z]+", text.lower())
+    filtered = [w for w in words if len(w) > 2 and w not in _STOP_WORDS]
+
+    if not filtered:
+        return ["session"]
+
+    # Frequency count — prefer words that appear more often
+    freq: dict[str, int] = {}
+    for w in filtered:
+        freq[w] = freq.get(w, 0) + 1
+
+    # Sort by frequency (desc), then alphabetically for tie-breaking
+    ranked = sorted(freq.keys(), key=lambda w: (-freq[w], w))
+    return ranked[:max_keywords]
+
+
+def generate_session_folder_name(history_text: str) -> str:
+    """
+    Create a session output folder inside ``./output/`` with a name derived
+    from the session history.
+
+    Rules:
+    - The base name is up to 16 characters, built from keywords in the
+      history text joined with underscores.
+    - If a folder with that name already exists, a serial suffix ``_001``,
+      ``_002``, … is appended (before the folder is created).
+    - The folder is created on disk and the full path is returned.
+    """
+    keywords = _extract_keywords(history_text)
+
+    # Build a base name from keywords, truncating to 16 chars
+    base = "_".join(keywords)
+    # Keep only filesystem-safe characters
+    base = re.sub(r"[^a-zA-Z0-9_]", "", base)
+    base = base[:16].rstrip("_") or "session"
+
+    output_root = os.path.join(".", "output")
+    os.makedirs(output_root, exist_ok=True)
+
+    candidate = os.path.join(output_root, base)
+    if not os.path.exists(candidate):
+        os.makedirs(candidate, exist_ok=True)
+        print(f"Session folder created: {candidate}")
+        return candidate
+
+    # Collision — append serial number _001, _002, …
+    serial = 1
+    while True:
+        suffixed = os.path.join(output_root, f"{base}_{serial:03d}")
+        if not os.path.exists(suffixed):
+            os.makedirs(suffixed, exist_ok=True)
+            print(f"Session folder created: {suffixed}")
+            return suffixed
+        serial += 1
+        if serial > 999:
+            # Extreme edge case — fall back to timestamp
+            import time
+            ts = str(int(time.time()))[-8:]
+            fallback = os.path.join(output_root, f"{base[:7]}_{ts}")
+            os.makedirs(fallback, exist_ok=True)
+            return fallback
+
+
+# ---------------------------------------------------------------------------
+# Session state management
+# ---------------------------------------------------------------------------
 def reset_session_state() -> None:
-    """Reset conversation state to defaults (does not touch model refs)."""
-    cfg.session_history = "The conversation started."
+    """Reset conversation state to defaults (does not touch model refs).
+
+    Seeds session_history from default_history (the saved starting template).
+    Creates a new session output folder based on the history text.
+    """
+    cfg.session_history = cfg.default_history
     cfg.scenario_log = ""
     cfg.agent_output = ""
     cfg.human_input = ""
     cfg.rotation_counter = 0
     cfg.latest_image_path = None
+    cfg.session_image_paths = []
+    cfg.session_folder = None          # will be created on first image
     print("Session state reset.")
 
 
@@ -189,7 +293,6 @@ def compute_vram_allocation(
     dict with keys:
         text_gpu_layers : int   (-1 = all, 0 = none, >0 = partial)
         image_offload_cpu : bool  (True = offload diffusion params to CPU)
-        image_vae_tiling : bool   (True when VRAM is constrained)
         info : str               (human-readable summary)
     """
     OVERHEAD_MB = 600  # KV-cache, VAE, Vulkan context, scratch
@@ -222,7 +325,6 @@ def compute_vram_allocation(
         return {
             "text_gpu_layers": -1,
             "image_offload_cpu": False,
-            "image_vae_tiling": False,
             "info": " | ".join(info_parts),
         }
 
@@ -238,7 +340,6 @@ def compute_vram_allocation(
         return {
             "text_gpu_layers": -1,
             "image_offload_cpu": True,
-            "image_vae_tiling": True,
             "info": " | ".join(info_parts),
         }
 
@@ -253,12 +354,11 @@ def compute_vram_allocation(
 
     info_parts.append(
         f"Constrained → text model: {gpu_layers}/{text_layers} layers on GPU, "
-        f"image model offloads to CPU, VAE tiling enabled."
+        f"image model offloads to CPU."
     )
     return {
         "text_gpu_layers": gpu_layers,
         "image_offload_cpu": True,
-        "image_vae_tiling": True,
         "info": " | ".join(info_parts),
     }
 

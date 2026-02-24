@@ -7,9 +7,17 @@
 #
 # UPDATED: When the image model folder is changed (browse or save),
 # ae.safetensors is automatically copied into the new folder if missing.
+#
+# UPDATED: Chronicler now has three modes — Happenings, Visualizer, Sequence.
+#          Sequence shows a gallery of all images generated in the current session.
+#          "Your Message" input is cleared after the user submits.
+#          Personalize panel uses default_history (saved template) separately
+#          from session_history (running consolidated narrative).
+#          Restore RP Defaults resets to hardcoded installer defaults and saves.
 
 import os
 import time
+import threading
 import gradio as gr
 
 from scripts import configure as cfg
@@ -20,7 +28,12 @@ from scripts.utilities import (
     detect_cpus,
     ensure_vae_in_image_folder,
 )
-from scripts.inference import prompt_response, generate_image, ensure_models_loaded
+from scripts.inference import (
+    prompt_response,
+    generate_image,
+    ensure_models_loaded,
+    get_image_gen_progress,
+)
 
 
 # -----------------------------------------------------------------------
@@ -56,7 +69,9 @@ def reset_session():
     placeholder = "./data/new_session.jpg"
     if not os.path.exists(placeholder):
         placeholder = None
-    return cfg.session_history, "", placeholder, "Session restarted."
+    # Returns: session_display, bot_response, generated_image, conv_status,
+    #          user_input (clear), sequence_gallery (clear)
+    return cfg.session_history, "", placeholder, "Session restarted.", "", []
 
 
 def filter_model_output(raw: str) -> str:
@@ -69,77 +84,190 @@ def filter_model_output(raw: str) -> str:
 
 def chat_with_model(user_input: str, right_mode: str):
     """
-    Main conversation loop: converse → consolidate → image.
-    If the right panel is on 'Happenings', skip image generation.
+    Main conversation loop: converse → consolidate → image_prompt → image.
+    If the right panel is on 'Happenings' or 'Sequence', skip image generation
+    (generate only when Visualizer is active).
 
-    Models are loaded on-demand (lazy) if they are not already in memory.
-    After a response is delivered, the idle timer is started so the watcher
-    thread can unload models after IDLE_UNLOAD_SECONDS of inactivity.
+    This is a **generator** — it yields partial updates at each pipeline
+    stage so the Gradio UI refreshes progressively instead of blocking
+    until the entire pipeline finishes.
+
+    Yields 6 values every iteration:
+        (scenario_log, session_history, image, status, user_input, sequence_gallery)
+
+    Image generation runs in a background thread so the generator can
+    poll ``get_image_gen_progress()`` and yield step-by-step status
+    updates to the status bar (e.g. "Generating image, step 3/8…").
     """
     if not user_input.strip():
-        return (
+        yield (
             "Please type a message.",
             cfg.session_history,
             None,
             "Waiting for input...",
+            user_input,                  # keep user's text (they typed nothing)
+            cfg.session_image_paths,
         )
+        return
 
     # Clear the idle timer — it is now the model's turn, not the user's.
     cfg.user_turn_start_time = None
 
     # ── Lazy-load models if needed ────────────────────────────────────────
     if not cfg.text_model_loaded:
+        yield (
+            cfg.scenario_log or "",
+            cfg.session_history or "",
+            None,
+            "Loading models… please wait.",
+            "",                          # clear input immediately
+            cfg.session_image_paths,
+        )
         ok, load_msg = ensure_models_loaded()
         if not ok:
-            # Restore idle timer so the watcher doesn't spin forever
             cfg.user_turn_start_time = time.time()
-            return (
+            yield (
                 "Models could not be loaded. Check the Configuration tab.",
                 cfg.session_history,
                 None,
                 load_msg,
+                "",
+                cfg.session_image_paths,
             )
+            return
 
-    cfg.human_input = user_input.strip()   # raw text — templates add the name prefix
+    cfg.human_input = user_input.strip()
 
     # Append the user's line to the running scenario log immediately
     cfg.scenario_log = (cfg.scenario_log + f"\n{cfg.human_name}: {cfg.human_input}").lstrip()
+
+    # Show the user's line right away — and clear the input box
+    yield (
+        cfg.scenario_log,
+        cfg.session_history,
+        None,
+        "Generating response…",
+        "",                              # clear user input
+        cfg.session_image_paths,
+    )
 
     # --- Step 1: converse --------------------------------------------------------
     result = prompt_response("converse")
     if "error" in result:
         cfg.user_turn_start_time = time.time()
-        return (
+        yield (
             cfg.scenario_log,
             cfg.session_history,
             None,
             f"Converse error: {result['error']}",
+            "",
+            cfg.session_image_paths,
         )
+        return
 
     filtered = filter_model_output(result["agent_response"])
     cfg.agent_output = filtered
-
-    # Append the agent's response to the scenario log
     cfg.scenario_log = cfg.scenario_log + f"\n{cfg.agent_output}"
+
+    # Yield with new dialogue visible immediately
+    yield (
+        cfg.scenario_log,
+        cfg.session_history,
+        None,
+        "Generating history…",
+        "",
+        cfg.session_image_paths,
+    )
 
     # --- Step 2: consolidate -----------------------------------------------------
     consolidate = prompt_response("consolidate")
     if "error" not in consolidate:
         cfg.session_history = consolidate["agent_response"]
 
-    # --- Step 3: image (only if Visualizer is active) ----------------------------
-    image_path = None
-    if right_mode == "Visualizer":
-        image_path = generate_image()
-        cfg.latest_image_path = image_path
-        status_msg = "Response generated with image."
-    else:
-        status_msg = "Response generated. Image skipped (Visualizer not active)."
+    # If no image needed, we're done
+    if right_mode != "Visualizer":
+        cfg.user_turn_start_time = time.time()
+        yield (
+            cfg.scenario_log,
+            cfg.session_history,
+            None,
+            "Response complete.",
+            "",
+            cfg.session_image_paths,
+        )
+        return
+
+    # --- Step 3: generate the visual prompt --------------------------------------
+    yield (
+        cfg.scenario_log,
+        cfg.session_history,
+        None,
+        "Generating prompt…",
+        "",
+        cfg.session_image_paths,
+    )
+
+    visual_prompt = None
+    if cfg.text_model_loaded:
+        img_prompt_result = prompt_response("image_prompt")
+        if "agent_response" in img_prompt_result:
+            visual_prompt = img_prompt_result["agent_response"]
+
+    if not visual_prompt:
+        visual_prompt = f"A scene at {cfg.scene_location}."
+
+    # --- Step 4: generate the image (threaded with progress polling) --------------
+    yield (
+        cfg.scenario_log,
+        cfg.session_history,
+        None,
+        "Generating image…",
+        "",
+        cfg.session_image_paths,
+    )
+
+    # Run image generation in a background thread so we can poll progress
+    _img_result: dict = {"path": None, "done": False}
+
+    def _worker():
+        _img_result["path"] = generate_image(scene_prompt=visual_prompt)
+        _img_result["done"] = True
+
+    thread = threading.Thread(target=_worker, daemon=True)
+    thread.start()
+
+    # Poll progress and yield status updates every ~1 second
+    while not _img_result["done"]:
+        step, total = get_image_gen_progress()
+        if total > 0 and step > 0:
+            status = f"Generating image, step {step}/{total}…"
+        else:
+            status = "Generating image…"
+        yield (
+            cfg.scenario_log,
+            cfg.session_history,
+            None,
+            status,
+            "",
+            cfg.session_image_paths,
+        )
+        time.sleep(1.0)
+
+    thread.join()
+    image_path = _img_result["path"]
+    cfg.latest_image_path = image_path
 
     # Control returns to user — start the idle timer.
     cfg.user_turn_start_time = time.time()
 
-    return cfg.scenario_log, cfg.session_history, image_path, status_msg
+    yield (
+        cfg.scenario_log,
+        cfg.session_history,
+        image_path,
+        "Response generated with image." if image_path else "Response generated (image failed).",
+        "",
+        cfg.session_image_paths,
+    )
 
 
 # -----------------------------------------------------------------------
@@ -154,37 +282,57 @@ def switch_left_panel(mode: str):
 
 
 def switch_right_panel_and_state(mode: str):
-    """Toggle visibility of Happenings vs Visualizer and update state."""
-    if mode == "Happenings":
-        return gr.update(visible=True), gr.update(visible=False), mode
-    else:
-        return gr.update(visible=False), gr.update(visible=True), mode
+    """Toggle visibility of Happenings / Visualizer / Sequence and update state."""
+    happenings_vis = (mode == "Happenings")
+    visualizer_vis = (mode == "Visualizer")
+    sequence_vis   = (mode == "Sequence")
+    return (
+        gr.update(visible=happenings_vis),
+        gr.update(visible=visualizer_vis),
+        gr.update(visible=sequence_vis),
+        mode,
+    )
 
 
 # -----------------------------------------------------------------------
 # Roleplay settings callbacks (Conversation tab — Personalize panel)
 # -----------------------------------------------------------------------
 def save_roleplay_settings(name, role, human, location, history):
-    """Save only the roleplay parameters."""
+    """Save the roleplay parameters from the Personalize panel.
+
+    *history* is the starting-template ("Default History") which is saved
+    to persistent.json as ``default_history``.  It does NOT overwrite the
+    running consolidated ``session_history``.
+    """
     cfg.agent_name = name
     cfg.agent_role = role
     cfg.human_name = human
     cfg.scene_location = location
-    cfg.session_history = history
+    cfg.default_history = history       # saved template only
     cfg.save_config()
     return "RP settings saved."
 
 
 def restore_roleplay_settings():
-    """Reload roleplay parameters from persistent.json (discard unsaved edits)."""
-    cfg.load_config()
+    """Restore RP fields to the hardcoded installer defaults.
+
+    Writes the defaults to both the runtime globals AND persistent.json so
+    that subsequent startups also use the defaults.
+    """
+    defaults = cfg.DEFAULT_RP_SETTINGS
+    cfg.agent_name    = defaults["agent_name"]
+    cfg.agent_role    = defaults["agent_role"]
+    cfg.human_name    = defaults["human_name"]
+    cfg.scene_location = defaults["scene_location"]
+    cfg.default_history = defaults["default_history"]
+    cfg.save_config()
     return (
         cfg.agent_name,
         cfg.agent_role,
         cfg.human_name,
         cfg.scene_location,
-        cfg.session_history,
-        "RP settings restored from file.",
+        cfg.default_history,
+        "RP defaults restored and saved.",
     )
 
 
@@ -356,10 +504,12 @@ def launch_gradio_interface() -> str | None:
                                 label="Scene Location",
                                 value=cfg.scene_location,
                             )
-                            rp_session_history = gr.Textbox(
+                            rp_default_history = gr.Textbox(
                                 label="Default History",
-                                value=cfg.session_history,
+                                value=cfg.default_history,
                                 lines=3,
+                                info="Starting narrative for each new session. "
+                                     "Not updated during conversation.",
                             )
                             with gr.Row():
                                 rp_save_btn = gr.Button(
@@ -372,7 +522,7 @@ def launch_gradio_interface() -> str | None:
                     # ── RIGHT COLUMN ─────────────────────────────────────
                     with gr.Column(scale=1):
                         right_mode = gr.Radio(
-                            choices=["Happenings", "Visualizer"],
+                            choices=["Happenings", "Visualizer", "Sequence"],
                             value="Visualizer",
                             label="Chronicler",
                             interactive=True,
@@ -402,6 +552,17 @@ def launch_gradio_interface() -> str | None:
                                 value=default_img,
                             )
 
+                        # -- Sequence panel --
+                        with gr.Column(visible=False) as sequence_panel:
+                            sequence_gallery = gr.Gallery(
+                                label="Session Images",
+                                columns=3,
+                                rows=4,
+                                height=500,
+                                object_fit="contain",
+                                value=cfg.session_image_paths,
+                            )
+
                 # ── Action buttons ───────────────────────────────────────
                 with gr.Row():
                     send_btn = gr.Button("Send Message", variant="primary")
@@ -429,14 +590,21 @@ def launch_gradio_interface() -> str | None:
                     outputs=[interaction_panel, personalize_panel],
                 )
 
-                # ── Right panel switching ────────────────────────────────
+                # ── Right panel switching (3 panels) ─────────────────────
                 right_mode.change(
                     fn=switch_right_panel_and_state,
                     inputs=right_mode,
-                    outputs=[happenings_panel, visualizer_panel, right_panel_state],
+                    outputs=[
+                        happenings_panel,
+                        visualizer_panel,
+                        sequence_panel,
+                        right_panel_state,
+                    ],
                 )
 
                 # ── Send message ─────────────────────────────────────────
+                # Outputs include user_input (to clear it) and
+                # sequence_gallery (to update the image list).
                 send_btn.click(
                     fn=chat_with_model,
                     inputs=[user_input, right_panel_state],
@@ -445,6 +613,8 @@ def launch_gradio_interface() -> str | None:
                         session_display,
                         generated_image,
                         conv_status,
+                        user_input,
+                        sequence_gallery,
                     ],
                 )
 
@@ -457,6 +627,8 @@ def launch_gradio_interface() -> str | None:
                         bot_response,
                         generated_image,
                         conv_status,
+                        user_input,
+                        sequence_gallery,
                     ],
                 )
 
@@ -468,7 +640,7 @@ def launch_gradio_interface() -> str | None:
                         rp_agent_role,
                         rp_human_name,
                         rp_scene_location,
-                        rp_session_history,
+                        rp_default_history,
                     ],
                     outputs=conv_status,
                 )
@@ -482,7 +654,7 @@ def launch_gradio_interface() -> str | None:
                         rp_agent_role,
                         rp_human_name,
                         rp_scene_location,
-                        rp_session_history,
+                        rp_default_history,
                         conv_status,
                     ],
                 )
@@ -609,7 +781,7 @@ def launch_gradio_interface() -> str | None:
                             choices=[str(c) for c in cfg.CFG_SCALE_OPTIONS],
                             value=str(cfg.selected_cfg_scale),
                             type="value",
-                            info="Use 0.0 for Turbo models. Higher = stronger prompt adherence.",
+                            info="Use 1.0 for Z-Image-Turbo (distilled). Higher = stronger prompt adherence.",
                         )
                     negative_prompt_in = gr.Textbox(
                         label="Negative Prompt (Z-Image-Turbo mostly ignores this)",
@@ -664,6 +836,9 @@ def launch_gradio_interface() -> str | None:
     # ------------------------------------------------------------------
     # Start the Gradio server (non-blocking, no browser)
     # ------------------------------------------------------------------
+    # queue() is required for generator functions (like chat_with_model)
+    # to stream partial results back to the UI progressively.
+    interface.queue()
     _app, local_url, _share_url = interface.launch(
         inbrowser=False,
         prevent_thread_lock=True,

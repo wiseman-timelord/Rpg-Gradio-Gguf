@@ -20,6 +20,9 @@
 # together exceed typical 8 GB VRAM budgets.  compute_vram_allocation() in
 # utilities.py determines how many text-model layers to offload to the GPU
 # and whether the image model should offload its parameters to system RAM.
+#
+# UPDATED: Images are saved into per-session folders under ./output/.
+#          Session folder is created lazily on the first image of each session.
 
 import os
 import re
@@ -31,6 +34,7 @@ from scripts.utilities import (
     calculate_optimal_threads,
     compute_vram_allocation,
     ensure_vae_in_image_folder,
+    generate_session_folder_name,
 )
 
 
@@ -337,20 +341,19 @@ def load_image_model() -> bool:
     # Smart VRAM allocation
     plan = _get_vram_plan()
     offload_cpu = plan["image_offload_cpu"]
-    vae_tiling = plan["image_vae_tiling"]
 
-    print(f"  Image model offload_params_to_cpu={offload_cpu}, "
-          f"vae_tiling={vae_tiling}")
+    print(f"  Image model offload_params_to_cpu={offload_cpu}")
 
     threads = calculate_optimal_threads(cfg.threads_percent)
 
     try:
+        # Z-Image-Turbo uses llm_path (Qwen3 LLM encoder), NOT clip_l_path.
+        # The Qwen3 model serves as a full LLM text encoder for the S3-DiT
+        # architecture — unlike FLUX which uses a traditional CLIP encoder.
         init_kwargs = {
             "diffusion_model_path": image_model_path,
-            "clip_l_path": llm_path,
+            "llm_path": llm_path,
             "vae_path": vae_path,
-            "vae_decode_only": True,
-            "vae_tiling": vae_tiling,
             "n_threads": threads,
         }
 
@@ -638,18 +641,53 @@ def prompt_response(task_name: str) -> dict:
 # -----------------------------------------------------------------------
 # Image generation  (Z-Image-Turbo)
 # -----------------------------------------------------------------------
+
+# Module-level progress state — updated by a callback from sd.cpp during
+# image generation.  Polled by the Gradio generator in displays.py.
+_img_progress: dict = {"step": 0, "total": 0}
+
+
+def _img_progress_callback(step: int, steps: int, time_taken: float) -> None:
+    """Called by stable-diffusion-cpp-python at each denoising step."""
+    _img_progress["step"] = step
+    _img_progress["total"] = steps
+
+
+def get_image_gen_progress() -> tuple[int, int]:
+    """Return ``(current_step, total_steps)`` for the running image job."""
+    return _img_progress["step"], _img_progress["total"]
+
+
+def _ensure_session_folder() -> str:
+    """
+    Lazily create (or return) the per-session output folder.
+
+    The folder name is derived from the current session_history text.
+    Once created it is cached in cfg.session_folder for the remainder of
+    the session.
+    """
+    if cfg.session_folder and os.path.isdir(cfg.session_folder):
+        return cfg.session_folder
+
+    history_text = cfg.session_history or cfg.default_history or "session"
+    cfg.session_folder = generate_session_folder_name(history_text)
+    return cfg.session_folder
+
+
 def generate_image(scene_prompt: str | None = None) -> str | None:
     """
     Generate an image from the current session context using Z-Image-Turbo.
 
     Pipeline:
-    1. If the text model is loaded, distil the session into a visual prompt
-       via the "image_prompt" task (recommended for roleplay context).
-    2. Call stable-diffusion-cpp-python's generate_image() with Z-Image params.
-    3. Save the resulting PIL image to ./generated/.
+    1. If *scene_prompt* is ``None`` and the text model is loaded, distil
+       the session into a visual prompt via the ``image_prompt`` task.
+    2. Call stable-diffusion-cpp-python's ``generate_image()`` with
+       Z-Image-Turbo params.
+    3. Save the resulting PIL image to the per-session folder in ``./output/``.
 
     Z-Image-Turbo notes:
-    - Guidance scale should be 0.0 (distilled Turbo model).
+    - CFG scale must be **1.0** for distilled models (0.0 = unconditioned,
+      the image will ignore the prompt entirely).
     - Negative prompts are mostly ignored but passed through if set.
     - Optimised for 8 NFEs (steps).
     - Resolutions should be multiples of 64.
@@ -690,11 +728,22 @@ def generate_image(scene_prompt: str | None = None) -> str | None:
     cfg_scale = cfg.selected_cfg_scale
     negative  = cfg.default_negative_prompt
 
+    # Safety: cfg_scale=0 triggers "unconditioned mode" in sd.cpp,
+    # which makes the image ignore the prompt completely.
+    if cfg_scale < 0.5:
+        print(f"  WARNING: cfg_scale={cfg_scale} would trigger unconditioned mode. "
+              f"Overriding to 1.0 for Z-Image-Turbo.")
+        cfg_scale = 1.0
+
     print(f"Generating image: {width}x{height}, {steps} steps, "
           f"cfg={cfg_scale}, method={method}")
     print(f"  Prompt: {visual_prompt[:150]}")
     if negative:
         print(f"  Negative: {negative[:80]}")
+
+    # Reset progress tracking
+    _img_progress["step"] = 0
+    _img_progress["total"] = steps
 
     try:
         gen_kwargs = {
@@ -704,40 +753,46 @@ def generate_image(scene_prompt: str | None = None) -> str | None:
             "sample_steps": steps,
             "sample_method": method,
             "cfg_scale": cfg_scale,
+            "progress_callback": _img_progress_callback,
         }
         # Only pass negative prompt if user provided one
         if negative:
             gen_kwargs["negative_prompt"] = negative
 
         output_images = cfg.image_model.generate_image(**gen_kwargs)
-    except TypeError:
-        # Fallback: older API versions may use txt_to_img() instead
-        try:
-            gen_kwargs_fallback = {
-                "prompt": visual_prompt,
-                "width": width,
-                "height": height,
-                "sample_steps": steps,
-                "sample_method": method,
-                "cfg_scale": cfg_scale,
-            }
-            if negative:
-                gen_kwargs_fallback["negative_prompt"] = negative
-
-            output_images = cfg.image_model.txt_to_img(**gen_kwargs_fallback)
-        except Exception as e:
-            print(f"Image generation failed (txt_to_img fallback): {e}")
-            return None
+    except TypeError as te:
+        # progress_callback might not be supported in older versions;
+        # retry without it, then try txt_to_img fallback.
+        if "progress_callback" in str(te):
+            gen_kwargs.pop("progress_callback", None)
+            try:
+                output_images = cfg.image_model.generate_image(**gen_kwargs)
+            except Exception as e2:
+                print(f"Image generation failed: {e2}")
+                return None
+        else:
+            # Fallback: older API versions may use txt_to_img() instead
+            try:
+                gen_kwargs.pop("progress_callback", None)
+                output_images = cfg.image_model.txt_to_img(**gen_kwargs)
+            except Exception as e:
+                print(f"Image generation failed (txt_to_img fallback): {e}")
+                return None
     except Exception as e:
         print(f"Image generation failed: {e}")
         return None
 
-    # --- Save the result ---------------------------------------------------------
-    os.makedirs("./generated", exist_ok=True)
-    image_path = os.path.join("./generated", f"{uuid.uuid4().hex}.png")
+    # Mark progress as complete
+    _img_progress["step"] = steps
+
+    # --- Save the result to per-session folder -----------------------------------
+    session_dir = _ensure_session_folder()
+    image_path = os.path.join(session_dir, f"{uuid.uuid4().hex}.png")
     try:
         output_images[0].save(image_path)
         print(f"Image saved: {image_path}")
+        # Track in session image list for Sequence panel
+        cfg.session_image_paths.append(image_path)
         return image_path
     except Exception as e:
         print(f"Failed to save image: {e}")
