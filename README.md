@@ -28,30 +28,33 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
         Rpg-Gradio-Gguf - Installation / Repair
     ===============================================================================
     
+    
     Python version: 3.12.4
     
-    [1/5] Creating directory structure...
+    [1/6] Creating directory structure...
       OK: ./data/
       OK: ./models/
       OK: ./models/text/
       OK: ./models/image/
       OK: ./scripts/
       OK: ./generated/
+      OK: ./logs/
     
-    [2/5] Creating virtual environment...
+    [2/6] Creating virtual environment...
       Virtual environment already exists, skipping creation.
     
-    [3/5] Installing Python packages into venv...
+    [3/6] Installing Python packages into venv...
       -> Upgrading pip
     Requirement already satisfied: pip in .\venv\Lib\site-packages (26.0.1)
       -> Installing core packages
     Requirement already satisfied: gradio>=4.0 in .\venv\Lib\site-packages (6.6.0)
     Requirement already satisfied: Pillow in .\venv\Lib\site-packages (12.1.1)
     Requirement already satisfied: gguf-parser in .\venv\Lib\site-packages (0.1.1)
+    Requirement already satisfied: pywebview>=5.0 in .\venv\Lib\site-packages (6.1)
     Requirement already satisfied: aiofiles<25.0,>=22.0 in .\venv\Lib\site-packages (from gradio>=4.0) (24.1.0)
     Requirement already satisfied: anyio<5.0,>=3.0 in .\venv\Lib\site-packages (from gradio>=4.0) (4.12.1)
     Requirement already satisfied: brotli>=1.1.0 in .\venv\Lib\site-packages (from gradio>=4.0) (1.2.0)
-    Requirement already satisfied: fastapi<1.0,>=0.115.2 in .\venv\Lib\site-packages (from gradio>=4.0) (0.129.2)
+    Requirement already satisfied: fastapi<1.0,>=0.115.2 in .\venv\Lib\site-packages (from gradio>=4.0) (0.132.0)
     Requirement already satisfied: ffmpy in .\venv\Lib\site-packages (from gradio>=4.0) (1.0.0)
     Requirement already satisfied: gradio-client==2.1.0 in .\venv\Lib\site-packages (from gradio>=4.0) (2.1.0)
     Requirement already satisfied: groovy~=0.1 in .\venv\Lib\site-packages (from gradio>=4.0) (0.1.2)
@@ -83,7 +86,7 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
     Requirement already satisfied: httpcore==1.* in .\venv\Lib\site-packages (from httpx<1.0,>=0.24.1->gradio>=4.0) (1.0.9)
     Requirement already satisfied: h11>=0.16 in .\venv\Lib\site-packages (from httpcore==1.*->httpx<1.0,>=0.24.1->gradio>=4.0) (0.16.0)
     Requirement already satisfied: filelock in .\venv\Lib\site-packages (from huggingface-hub<2.0,>=0.33.5->gradio>=4.0) (3.24.3)
-    Requirement already satisfied: hf-xet<2.0.0,>=1.2.0 in .\venv\Lib\site-packages (from huggingface-hub<2.0,>=0.33.5->gradio>=4.0) (1.2.0)
+    Requirement already satisfied: hf-xet<2.0.0,>=1.2.0 in .\venv\Lib\site-packages (from huggingface-hub<2.0,>=0.33.5->gradio>=4.0) (1.3.0)
     Requirement already satisfied: shellingham in .\venv\Lib\site-packages (from huggingface-hub<2.0,>=0.33.5->gradio>=4.0) (1.5.4)
     Requirement already satisfied: tqdm>=4.42.1 in .\venv\Lib\site-packages (from huggingface-hub<2.0,>=0.33.5->gradio>=4.0) (4.67.3)
     Requirement already satisfied: typer-slim in .\venv\Lib\site-packages (from huggingface-hub<2.0,>=0.33.5->gradio>=4.0) (0.24.0)
@@ -95,11 +98,17 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
     Requirement already satisfied: rich>=12.3.0 in .\venv\Lib\site-packages (from typer<1.0,>=0.12->gradio>=4.0) (14.3.3)
     Collecting argparse (from gguf-parser)
       Using cached argparse-1.4.0-py2.py3-none-any.whl.metadata (2.8 kB)
+    Requirement already satisfied: pythonnet in .\venv\Lib\site-packages (from pywebview>=5.0) (3.0.5)
+    Requirement already satisfied: proxy_tools in .\venv\Lib\site-packages (from pywebview>=5.0) (0.1.0)
+    Requirement already satisfied: bottle in .\venv\Lib\site-packages (from pywebview>=5.0) (0.13.4)
     Requirement already satisfied: colorama in .\venv\Lib\site-packages (from click>=8.2.1->typer<1.0,>=0.12->gradio>=4.0) (0.4.6)
     Requirement already satisfied: six>=1.5 in .\venv\Lib\site-packages (from python-dateutil>=2.8.2->pandas<4.0,>=1.0->gradio>=4.0) (1.17.0)
     Requirement already satisfied: markdown-it-py>=2.2.0 in .\venv\Lib\site-packages (from rich>=12.3.0->typer<1.0,>=0.12->gradio>=4.0) (4.0.0)
     Requirement already satisfied: pygments<3.0.0,>=2.13.0 in .\venv\Lib\site-packages (from rich>=12.3.0->typer<1.0,>=0.12->gradio>=4.0) (2.19.2)
     Requirement already satisfied: mdurl~=0.1 in .\venv\Lib\site-packages (from markdown-it-py>=2.2.0->rich>=12.3.0->typer<1.0,>=0.12->gradio>=4.0) (0.1.2)
+    Requirement already satisfied: clr_loader<0.3.0,>=0.2.7 in .\venv\Lib\site-packages (from pythonnet->pywebview>=5.0) (0.2.10)
+    Requirement already satisfied: cffi>=1.17 in .\venv\Lib\site-packages (from clr_loader<0.3.0,>=0.2.7->pythonnet->pywebview>=5.0) (2.0.0)
+    Requirement already satisfied: pycparser in .\venv\Lib\site-packages (from cffi>=1.17->clr_loader<0.3.0,>=0.2.7->pythonnet->pywebview>=5.0) (3.0)
     Using cached argparse-1.4.0-py2.py3-none-any.whl (23 kB)
     Installing collected packages: argparse
     Successfully installed argparse-1.4.0
@@ -112,15 +121,20 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
     Requirement already satisfied: diskcache>=5.6.1 in .\venv\Lib\site-packages (from llama-cpp-python) (5.6.3)
     Requirement already satisfied: jinja2>=2.11.3 in .\venv\Lib\site-packages (from llama-cpp-python) (3.1.6)
     Requirement already satisfied: MarkupSafe>=2.0 in .\venv\Lib\site-packages (from jinja2>=2.11.3->llama-cpp-python) (3.0.3)
-      -> stable-diffusion-cpp-python
+      -> Installing stable-diffusion-cpp-python (Vulkan build)...
+         NOTE: Requires Vulkan SDK. Install from https://www.lunarg.com/vulkan-sdk/
+      -> stable-diffusion-cpp-python (Vulkan)
     Requirement already satisfied: stable-diffusion-cpp-python in .\venv\Lib\site-packages (0.4.5)
     Requirement already satisfied: typing-extensions>=4.5.0 in .\venv\Lib\site-packages (from stable-diffusion-cpp-python) (4.15.0)
     Requirement already satisfied: pillow>=10.2.0 in .\venv\Lib\site-packages (from stable-diffusion-cpp-python) (12.1.1)
     
-    [4/5] Downloading llama.cpp Vulkan binaries...
+    [4/6] Downloading llama.cpp Vulkan binaries...
       Vulkan binaries already present, skipping download.
     
-    [5/5] Creating default configuration and assets...
+    [5/6] Downloading ae.safetensors (VAE for Z-Image-Turbo)...
+      ae.safetensors already present (320 MB), skipping download.
+    
+    [6/6] Creating default configuration and assets...
       Config already exists: .\data\persistent.json
     
     
@@ -131,12 +145,21 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
       [+] OK    Virtual Environment
       [+] OK    Python Packages
       [+] OK    Vulkan Binaries
+      [+] OK    VAE (ae.safetensors)
       [+] OK    Config & Assets
     ============================================================
       All steps completed successfully.
     
-      Place your GGUF text model in  ./models/text/
-      Place your GGUF image model in ./models/image/
+      MODELS TO DOWNLOAD:
+      ---
+      Text:  Qwen3-4b-Z-Image-Turbo-AbliteratedV1.Q4_K_M.gguf
+             -> ./models/text/
+             (also serves as image encoder)
+    
+      Image: z_image_turbo-Q4_0.gguf
+             -> ./models/image/
+             (ae.safetensors auto-copied here on first use)
+      ---
       Then launch from the batch menu (option 1 or 2).
     ============================================================
     
