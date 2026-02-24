@@ -877,6 +877,12 @@ def launch_gradio_interface() -> str | None:
                 # Outputs include user_input (to clear it),
                 # sequence_gallery (to update the image list), and
                 # send_btn / cancel_btn (to toggle visibility).
+                #
+                # The .then() callback fires after the generator stream ends
+                # and explicitly restores the Send / Cancel button state.
+                # This is necessary because Gradio streaming generators do not
+                # reliably apply UI updates from the final yield; the .then()
+                # ensures Cancel is always hidden once the pipeline is done.
                 send_btn.click(
                     fn=chat_with_model,
                     inputs=[user_input, right_panel_state],
@@ -890,6 +896,10 @@ def launch_gradio_interface() -> str | None:
                         send_btn,
                         cancel_btn,
                     ],
+                ).then(
+                    fn=lambda: (gr.update(visible=True), gr.update(visible=False)),
+                    inputs=[],
+                    outputs=[send_btn, cancel_btn],
                 )
 
                 # ── Cancel response ───────────────────────────────────────

@@ -55,7 +55,7 @@ human_gender: str = "None"       # "None" -> omit from prompts
 # Scene / setting
 # ---------------------------------------------------------------------------
 scene_location: str = "A misty forest clearing"
-event_time: str     = "16:20"    # blank / "None" -> omit from prompts
+event_time: str     = "07:13"    # blank / "None" -> omit from prompts
 
 # ---------------------------------------------------------------------------
 # Session narrative
@@ -182,7 +182,7 @@ DEFAULT_RP_SETTINGS: dict = {
     "human_gender": "None",
 
     "scene_location": "A misty forest clearing",
-    "event_time":     "16:20",
+    "event_time":     "07:13",
 
     "default_history": (
         "The three roleplayers approached one another, "
