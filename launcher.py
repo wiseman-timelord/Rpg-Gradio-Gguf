@@ -20,6 +20,7 @@ import sys
 import time
 import threading
 import atexit
+import platform
 
 # Ensure project root is on sys.path so `scripts` package resolves
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -63,6 +64,78 @@ def _close_log() -> None:
 
 # Call immediately — before any other import that might print
 _setup_logging()
+
+
+# ---------------------------------------------------------------------------
+# Windows: set AppUserModelID so the taskbar shows our icon, not Python's.
+# Must be called BEFORE any window is created.
+# ---------------------------------------------------------------------------
+if platform.system() == "Windows":
+    try:
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            "Anthropic.RpgGradioGguf.App.1"
+        )
+    except Exception:
+        pass
+
+
+def _set_window_icon_win32(icon_path: str, window_title: str = "Rpg-Gradio-Gguf") -> None:
+    """
+    Set the titlebar (small) and taskbar (big) icon on a Windows window
+    using ctypes calls to user32.dll.
+
+    pywebview's ``webview.start(icon=...)`` only works on GTK/QT, so on
+    Windows we must call LoadImageW + SendMessageW directly.
+
+    Parameters
+    ----------
+    icon_path : str
+        Absolute path to the .ico file.
+    window_title : str
+        The exact window title so FindWindowW can locate the HWND.
+    """
+    if platform.system() != "Windows":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        user32 = ctypes.windll.user32
+
+        # Win32 constants
+        WM_SETICON   = 0x0080
+        ICON_SMALL   = 0
+        ICON_BIG     = 1
+        IMAGE_ICON   = 1
+        LR_LOADFROMFILE = 0x0010
+
+        # Find the window by its title
+        hwnd = user32.FindWindowW(None, window_title)
+        if not hwnd:
+            print(f"  Could not find window '{window_title}' for icon assignment.")
+            return
+
+        # Load the icon at both sizes from the .ico file
+        # 16×16 for the titlebar, 32×32 for the taskbar / Alt-Tab
+        icon_small = user32.LoadImageW(
+            None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE
+        )
+        icon_big = user32.LoadImageW(
+            None, icon_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE
+        )
+
+        if icon_small:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, icon_small)
+        if icon_big:
+            user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, icon_big)
+
+        if icon_small or icon_big:
+            print(f"  Window icon set from {icon_path}")
+        else:
+            print(f"  WARNING: LoadImageW returned NULL — is the .ico valid?")
+    except Exception as e:
+        print(f"  Could not set window icon: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -245,6 +318,13 @@ def main() -> None:
 
     # Open the pywebview application window
     print(f"Opening application window → {local_url}")
+    icon_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "data", "rpggradiogguf_icon.ico"
+    )
+    if not os.path.isfile(icon_path):
+        print(f"  Icon not found at {icon_path} — using default icon.")
+        icon_path = None
+
     window = webview.create_window(
         title="Rpg-Gradio-Gguf",
         url=local_url,
@@ -254,9 +334,19 @@ def main() -> None:
         min_size=(900, 600),
     )
 
+    # Callback executed once the window is fully shown — sets the
+    # titlebar and taskbar icon via Win32 API (ctypes).
+    def _on_window_shown():
+        if icon_path:
+            # Small delay to ensure the window's HWND is fully initialised
+            time.sleep(0.5)
+            _set_window_icon_win32(icon_path, window_title="Rpg-Gradio-Gguf")
+
     # webview.start() blocks the main thread until ALL windows are closed.
     # This happens when the user clicks [X] or "Exit Program" calls shutdown().
-    webview.start()
+    # The func parameter runs in a background thread after the first window
+    # is shown — we use it to set the icon via the Win32 API.
+    webview.start(func=_on_window_shown)
 
     # If we reach here, the window was closed — terminate everything.
     print("Application window closed. Exiting.")

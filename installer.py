@@ -81,7 +81,7 @@ DEFAULT_CONFIG = {
     "vram_assigned": 8192,
 
     # --- Image generation settings (Z-Image-Turbo) ---
-    "image_size":      "512x512",
+    "image_size":      "512x256",
     "image_steps":     4,
     "sample_method":   "euler",
     "cfg_scale":       2.0,
@@ -433,9 +433,9 @@ def main():
     # Results summary
     # -----------------------------------------------------------------------
     print("\n")
-    print("=" * 60)
+    print("=" * 79)
     print("  Installation Summary")
-    print("=" * 60)
+    print("=" * 79)
     all_passed = True
     for label, passed in results:
         status = "OK  " if passed else "FAIL"
@@ -443,7 +443,7 @@ def main():
         print(f"  [{marker}] {status}  {label}")
         if not passed:
             all_passed = False
-    print("=" * 60)
+    print("=" * 79)
 
     if all_passed:
         print("  All steps completed successfully.")
@@ -452,7 +452,7 @@ def main():
         print("  ---")
         print("  Text:  Qwen3-4b-Z-Image-Turbo-AbliteratedV1.Q4_K_M.gguf")
         print("         -> ./models/text/")
-        print("         (also serves as image encoder)")
+        print("         (also serves as image prompt generator)")
         print()
         print("  Image: z_image_turbo-Q4_0.gguf")
         print("         -> ./models/image/")
@@ -463,7 +463,7 @@ def main():
         print("  One or more steps failed — see output above for details.")
         print("  Re-run this installer to retry failed steps.")
 
-    print("=" * 60)
+    print("=" * 79)
 
     # -----------------------------------------------------------------------
     # Pause before returning to batch menu

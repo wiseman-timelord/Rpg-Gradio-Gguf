@@ -8,12 +8,15 @@
 # UPDATED: When the image model folder is changed (browse or save),
 # ae.safetensors is automatically copied into the new folder if missing.
 #
-# UPDATED: Chronicler now has three modes — Happenings, Visualizer, Sequence.
-#          Sequence shows a gallery of all images generated in the current session.
+# UPDATED: Chronicler has two modes — Happenings and Visualizer.
+#          Visualizer shows the Generated Image with a Sequence thumbnail
+#          strip beneath it showing all session images (newest first).
+#          Images are ALWAYS generated regardless of Chronicler mode.
 #          "Your Message" input is cleared after the user submits.
 #          Personalize panel uses default_history (saved template) separately
 #          from session_history (running consolidated narrative).
 #          Restore RP Defaults resets to hardcoded installer defaults and saves.
+#          Browser spellcheck context-menu is enabled on all text inputs.
 
 import os
 import time
@@ -70,7 +73,7 @@ def reset_session():
     if not os.path.exists(placeholder):
         placeholder = None
     # Returns: session_display, bot_response, generated_image, conv_status,
-    #          user_input (clear), sequence_gallery (clear)
+    #          user_input (clear), sequence_gallery (clear — newest first)
     return cfg.session_history, "", placeholder, "Session restarted.", "", []
 
 
@@ -85,8 +88,8 @@ def filter_model_output(raw: str) -> str:
 def chat_with_model(user_input: str, right_mode: str):
     """
     Main conversation loop: converse → consolidate → image_prompt → image.
-    If the right panel is on 'Happenings' or 'Sequence', skip image generation
-    (generate only when Visualizer is active).
+    Images are ALWAYS generated regardless of the Chronicler panel mode
+    so users can read Happenings while waiting for image generation.
 
     This is a **generator** — it yields partial updates at each pipeline
     stage so the Gradio UI refreshes progressively instead of blocking
@@ -94,6 +97,9 @@ def chat_with_model(user_input: str, right_mode: str):
 
     Yields 6 values every iteration:
         (scenario_log, session_history, image, status, user_input, sequence_gallery)
+
+    The sequence_gallery list is always newest-first so the most recent
+    image appears at the left of the thumbnail strip.
 
     Image generation runs in a background thread so the generator can
     poll ``get_image_gen_progress()`` and yield step-by-step status
@@ -103,10 +109,10 @@ def chat_with_model(user_input: str, right_mode: str):
         yield (
             "Please type a message.",
             cfg.session_history,
-            None,
+            cfg.latest_image_path,
             "Waiting for input...",
             user_input,                  # keep user's text (they typed nothing)
-            cfg.session_image_paths,
+            list(reversed(cfg.session_image_paths)),
         )
         return
 
@@ -118,10 +124,10 @@ def chat_with_model(user_input: str, right_mode: str):
         yield (
             cfg.scenario_log or "",
             cfg.session_history or "",
-            None,
+            cfg.latest_image_path,
             "Loading models… please wait.",
             "",                          # clear input immediately
-            cfg.session_image_paths,
+            list(reversed(cfg.session_image_paths)),
         )
         ok, load_msg = ensure_models_loaded()
         if not ok:
@@ -129,10 +135,10 @@ def chat_with_model(user_input: str, right_mode: str):
             yield (
                 "Models could not be loaded. Check the Configuration tab.",
                 cfg.session_history,
-                None,
+                cfg.latest_image_path,
                 load_msg,
                 "",
-                cfg.session_image_paths,
+                list(reversed(cfg.session_image_paths)),
             )
             return
 
@@ -145,10 +151,10 @@ def chat_with_model(user_input: str, right_mode: str):
     yield (
         cfg.scenario_log,
         cfg.session_history,
-        None,
+        cfg.latest_image_path,
         "Generating response…",
         "",                              # clear user input
-        cfg.session_image_paths,
+        list(reversed(cfg.session_image_paths)),
     )
 
     # --- Step 1: converse --------------------------------------------------------
@@ -158,10 +164,10 @@ def chat_with_model(user_input: str, right_mode: str):
         yield (
             cfg.scenario_log,
             cfg.session_history,
-            None,
+            cfg.latest_image_path,
             f"Converse error: {result['error']}",
             "",
-            cfg.session_image_paths,
+            list(reversed(cfg.session_image_paths)),
         )
         return
 
@@ -173,10 +179,10 @@ def chat_with_model(user_input: str, right_mode: str):
     yield (
         cfg.scenario_log,
         cfg.session_history,
-        None,
+        cfg.latest_image_path,
         "Generating history…",
         "",
-        cfg.session_image_paths,
+        list(reversed(cfg.session_image_paths)),
     )
 
     # --- Step 2: consolidate -----------------------------------------------------
@@ -184,27 +190,14 @@ def chat_with_model(user_input: str, right_mode: str):
     if "error" not in consolidate:
         cfg.session_history = consolidate["agent_response"]
 
-    # If no image needed, we're done
-    if right_mode != "Visualizer":
-        cfg.user_turn_start_time = time.time()
-        yield (
-            cfg.scenario_log,
-            cfg.session_history,
-            None,
-            "Response complete.",
-            "",
-            cfg.session_image_paths,
-        )
-        return
-
     # --- Step 3: generate the visual prompt --------------------------------------
     yield (
         cfg.scenario_log,
         cfg.session_history,
-        None,
+        cfg.latest_image_path,
         "Generating prompt…",
         "",
-        cfg.session_image_paths,
+        list(reversed(cfg.session_image_paths)),
     )
 
     visual_prompt = None
@@ -220,10 +213,10 @@ def chat_with_model(user_input: str, right_mode: str):
     yield (
         cfg.scenario_log,
         cfg.session_history,
-        None,
+        cfg.latest_image_path,
         "Generating image…",
         "",
-        cfg.session_image_paths,
+        list(reversed(cfg.session_image_paths)),
     )
 
     # Run image generation in a background thread so we can poll progress
@@ -246,10 +239,10 @@ def chat_with_model(user_input: str, right_mode: str):
         yield (
             cfg.scenario_log,
             cfg.session_history,
-            None,
+            cfg.latest_image_path,
             status,
             "",
-            cfg.session_image_paths,
+            list(reversed(cfg.session_image_paths)),
         )
         time.sleep(1.0)
 
@@ -266,7 +259,7 @@ def chat_with_model(user_input: str, right_mode: str):
         image_path,
         "Response generated with image." if image_path else "Response generated (image failed).",
         "",
-        cfg.session_image_paths,
+        list(reversed(cfg.session_image_paths)),
     )
 
 
@@ -282,16 +275,27 @@ def switch_left_panel(mode: str):
 
 
 def switch_right_panel_and_state(mode: str):
-    """Toggle visibility of Happenings / Visualizer / Sequence and update state."""
+    """Toggle visibility of Happenings / Visualizer panels and update state."""
     happenings_vis = (mode == "Happenings")
     visualizer_vis = (mode == "Visualizer")
-    sequence_vis   = (mode == "Sequence")
     return (
         gr.update(visible=happenings_vis),
         gr.update(visible=visualizer_vis),
-        gr.update(visible=sequence_vis),
         mode,
     )
+
+
+def on_gallery_select(evt: gr.SelectData):
+    """When the user clicks a thumbnail in the Sequence strip, display it
+    in the Generated Image box.  The gallery value list is newest-first."""
+    if evt.value and isinstance(evt.value, dict):
+        # Gradio 4.x: evt.value is a dict with 'image'/'path' keys
+        path = evt.value.get("image", {}).get("path") or evt.value.get("path")
+        if path:
+            return path
+    elif evt.value and isinstance(evt.value, str):
+        return evt.value
+    return gr.update()  # no change
 
 
 # -----------------------------------------------------------------------
@@ -450,7 +454,64 @@ def launch_gradio_interface() -> str | None:
     )
     valid_threads = min(cfg.cpu_threads, max_threads)
 
-    with gr.Blocks(title="Rpg-Gradio-Gguf") as interface:
+    # Custom JS to enable native browser spellcheck context-menu on all
+    # textareas and text inputs — allows right-click spelling suggestions.
+    _SPELLCHECK_JS = """
+    () => {
+        // Enable spellcheck on all textareas and text inputs
+        function enableSpellcheck() {
+            document.querySelectorAll('textarea, input[type="text"]').forEach(el => {
+                el.setAttribute('spellcheck', 'true');
+                el.setAttribute('lang', 'en');
+            });
+        }
+        enableSpellcheck();
+        // Re-apply when Gradio dynamically adds new elements
+        const observer = new MutationObserver(enableSpellcheck);
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+    """
+
+    # Custom CSS for proper image scaling and gallery thumbnail sizing
+    _CUSTOM_CSS = """
+    /* ── Generated Image: scale to fit, not stretch, smooth ── */
+    #generated_image img {
+        object-fit: contain !important;
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* ── Sequence gallery: single-row thumbnail strip ── */
+    #sequence_gallery .grid-container,
+    #sequence_gallery .grid-wrap {
+        /* Force thumbnails to fit within the gallery height */
+        gap: 4px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        flex-wrap: nowrap !important;
+    }
+    #sequence_gallery .thumbnail-item,
+    #sequence_gallery .thumbnail-lg {
+        /* Fixed thumbnail cells — square, fitting within 132px strip */
+        min-width: 100px !important;
+        max-width: 100px !important;
+        min-height: 100px !important;
+        max-height: 100px !important;
+        flex-shrink: 0 !important;
+    }
+    #sequence_gallery .thumbnail-item img,
+    #sequence_gallery .thumbnail-lg img {
+        object-fit: contain !important;
+        width: 100% !important;
+        height: 100% !important;
+    }
+    """
+
+    with gr.Blocks(
+        title="Rpg-Gradio-Gguf",
+        js=_SPELLCHECK_JS,
+        css=_CUSTOM_CSS,
+    ) as interface:
         gr.Markdown("# ⚔️ Rpg-Gradio-Gguf")
 
         with gr.Tabs():
@@ -476,7 +537,7 @@ def launch_gradio_interface() -> str | None:
                         with gr.Column(visible=True) as interaction_panel:
                             bot_response = gr.Textbox(
                                 label="Scenario Log",
-                                lines=12,
+                                lines=16,
                                 interactive=False,
                             )
                             user_input = gr.Textbox(
@@ -485,6 +546,7 @@ def launch_gradio_interface() -> str | None:
                                 placeholder="Type your message here...",
                                 interactive=True,
                             )
+                            send_btn = gr.Button("Send Message")
 
                         # -- Personalize panel (no header) --
                         with gr.Column(visible=False) as personalize_panel:
@@ -505,24 +567,22 @@ def launch_gradio_interface() -> str | None:
                                 value=cfg.scene_location,
                             )
                             rp_default_history = gr.Textbox(
-                                label="Default History",
-                                value=cfg.default_history,
+                                label="Starting Narrative",
+                                value=cfg.default_history,  # Used in only initial prompt.
                                 lines=3,
-                                info="Starting narrative for each new session. "
-                                     "Not updated during conversation.",
                             )
                             with gr.Row():
                                 rp_save_btn = gr.Button(
                                     "Save RP Settings", variant="primary"
                                 )
                                 rp_restore_btn = gr.Button(
-                                    "Restore RP Defaults"
+                                    "Restore RP Defaults", variant="stop"
                                 )
 
                     # ── RIGHT COLUMN ─────────────────────────────────────
                     with gr.Column(scale=1):
                         right_mode = gr.Radio(
-                            choices=["Happenings", "Visualizer", "Sequence"],
+                            choices=["Happenings", "Visualizer"],
                             value="Visualizer",
                             label="Chronicler",
                             interactive=True,
@@ -532,12 +592,13 @@ def launch_gradio_interface() -> str | None:
                         with gr.Column(visible=False) as happenings_panel:
                             session_display = gr.Textbox(
                                 label="Consolidated History",
-                                lines=20,
+                                lines=25,
                                 value=cfg.session_history,
                                 interactive=False,
                             )
+                            reset_btn_happenings = gr.Button("Restart Session", variant="primary")
 
-                        # -- Visualizer panel --
+                        # -- Visualizer panel (image + sequence strip) --
                         with gr.Column(visible=True) as visualizer_panel:
                             default_img = (
                                 "./data/new_session.jpg"
@@ -548,25 +609,25 @@ def launch_gradio_interface() -> str | None:
                                 label="Generated Image",
                                 type="filepath",
                                 interactive=False,
-                                height=490,
+                                height=420,
                                 value=default_img,
+                                elem_id="generated_image",
                             )
-
-                        # -- Sequence panel --
-                        with gr.Column(visible=False) as sequence_panel:
+                            # Single-row thumbnail strip — newest image first.
+                            # Height accommodates ~100px thumbnails + label/padding.
+                            # object_fit="contain" scales each thumbnail to fit
+                            # within its cell without cropping.
                             sequence_gallery = gr.Gallery(
-                                label="Session Images",
-                                columns=3,
-                                rows=4,
-                                height=500,
+                                label="Sequence",
+                                columns=8,
+                                rows=1,
+                                height=132,
                                 object_fit="contain",
-                                value=cfg.session_image_paths,
+                                allow_preview=False,
+                                value=list(reversed(cfg.session_image_paths)),
+                                elem_id="sequence_gallery",
                             )
-
-                # ── Action buttons ───────────────────────────────────────
-                with gr.Row():
-                    send_btn = gr.Button("Send Message", variant="primary")
-                    reset_btn = gr.Button("Restart Session")
+                            reset_btn_visualizer = gr.Button("Restart Session", variant="primary")
 
                 # ── Status bar + Exit ────────────────────────────────────
                 with gr.Row():
@@ -590,16 +651,22 @@ def launch_gradio_interface() -> str | None:
                     outputs=[interaction_panel, personalize_panel],
                 )
 
-                # ── Right panel switching (3 panels) ─────────────────────
+                # ── Right panel switching (2 panels) ─────────────────────
                 right_mode.change(
                     fn=switch_right_panel_and_state,
                     inputs=right_mode,
                     outputs=[
                         happenings_panel,
                         visualizer_panel,
-                        sequence_panel,
                         right_panel_state,
                     ],
+                )
+
+                # ── Gallery thumbnail click → show in Generated Image ────
+                sequence_gallery.select(
+                    fn=on_gallery_select,
+                    inputs=None,
+                    outputs=generated_image,
                 )
 
                 # ── Send message ─────────────────────────────────────────
@@ -618,19 +685,17 @@ def launch_gradio_interface() -> str | None:
                     ],
                 )
 
-                # ── Reset session ────────────────────────────────────────
-                reset_btn.click(
-                    fn=reset_session,
-                    inputs=[],
-                    outputs=[
-                        session_display,
-                        bot_response,
-                        generated_image,
-                        conv_status,
-                        user_input,
-                        sequence_gallery,
-                    ],
-                )
+                # ── Reset session (one button per right panel, both wired the same) ──
+                _reset_outputs = [
+                    session_display,
+                    bot_response,
+                    generated_image,
+                    conv_status,
+                    user_input,
+                    sequence_gallery,
+                ]
+                reset_btn_happenings.click(fn=reset_session, inputs=[], outputs=_reset_outputs)
+                reset_btn_visualizer.click(fn=reset_session, inputs=[], outputs=_reset_outputs)
 
                 # ── Save RP settings ─────────────────────────────────────
                 rp_save_btn.click(
@@ -722,7 +787,7 @@ def launch_gradio_interface() -> str | None:
                         )
 
                 # ── MODEL FOLDERS ────────────────────────────────────────
-                gr.Markdown("### Model Folders")
+                gr.Markdown("### Model Folders") # Text model also is image encoder. ae.safetensors auto-copied to image folder when set.
                 with gr.Row():
                     text_folder_in = gr.Textbox(
                         label="Text Model Folder",
@@ -736,11 +801,6 @@ def launch_gradio_interface() -> str | None:
                         scale=4,
                     )
                     image_browse_btn = gr.Button("Browse...", scale=1)
-
-                gr.Markdown(
-                    "*Text model (Qwen3-4b) also serves as the image encoder. "
-                    "ae.safetensors is auto-copied to the image folder when set.*",
-                )
 
                 text_browse_btn.click(
                     fn=browse_text_folder,
@@ -786,7 +846,7 @@ def launch_gradio_interface() -> str | None:
                     negative_prompt_in = gr.Textbox(
                         label="Negative Prompt (Z-Image-Turbo mostly ignores this)",
                         value=cfg.default_negative_prompt,
-                        lines=2,
+                        lines=1,
                         placeholder="Leave empty for best results with Z-Image-Turbo",
                     )
 

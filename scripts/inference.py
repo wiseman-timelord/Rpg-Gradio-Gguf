@@ -715,8 +715,8 @@ def generate_image(scene_prompt: str | None = None) -> str | None:
     except ValueError:
         width, height = 768, 1024
 
-    # Z-Image-Turbo works well from 512 upward; round to nearest multiple of 64.
-    MIN_SIZE = 512
+    # Z-Image-Turbo works well from 256 upward; round to nearest multiple of 64.
+    MIN_SIZE = 256
     width  = max(MIN_SIZE, (width  // 64) * 64)
     height = max(MIN_SIZE, (height // 64) * 64)
     if width != int(size_str.split("x")[0]) or height != int(size_str.split("x")[1]):

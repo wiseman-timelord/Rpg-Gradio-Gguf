@@ -109,6 +109,7 @@ VRAM_OPTIONS: list[int] = [2048, 4096, 6144, 8192, 10240, 12288, 16384, 24576]
 # It works well at 512-1024 range; 768x1024 is a sweet spot for portraits.
 IMAGE_SIZE_OPTIONS: dict = {
     "available_sizes": [
+        "256x256", "256x512", "512x256",
         "512x512",
         "512x768", "768x512", "768x768",
         "768x1024", "1024x768", "1024x1024",
