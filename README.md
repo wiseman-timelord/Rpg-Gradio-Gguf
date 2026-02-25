@@ -28,6 +28,10 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 
 ![preview_image](media/configuration_page.jpg)
 
+- The dynamic, SendMessage/CancelResponse and YourMessage/ProgressIndication, section...
+
+![preview_image](media/workflow_progress.jpg)
+
 <details>
 <summary>The installation processes, installing in program folder..(v2.04)</summary>
 
