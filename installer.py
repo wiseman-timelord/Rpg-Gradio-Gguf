@@ -84,7 +84,7 @@ DEFAULT_CONFIG = {
 
     # --- Scene / Setting ---
     "scene_location": "A misty forest clearing",
-    "event_time":     "07:13",
+    "event_time":     "16:20",
 
     # --- Starting narrative ---
     "default_history": "The three roleplayers approached one another, and the conversation started.",
