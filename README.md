@@ -208,9 +208,9 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 </details>
 
 ### Requirements
-- Architecture - 64-Bit compatible processors only.
+- Architecture - 64-Bit compatible processors/packages only.
 - Windows - Windows 10(b1809+)-11
-- Python - 3.10-3.12 (x64 only)
+- Python - 3.10-3.12 Only
 - Powershell - 5.1+ (built in to windows 10/11)
 - LLMs - For the 2 models we are using, see Models section.
 - CPU - Any x64 Cpu, the more threads the better. Testing was done on 20/24 threads. 
