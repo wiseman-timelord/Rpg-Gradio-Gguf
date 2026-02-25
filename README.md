@@ -240,7 +240,7 @@ Here is some info about the modesls...
 ### Notation
 - Test input 1 for 1 Agent: `Hello, you look wise for a llama, are you a wise llama, that knows wise things?`
 - Test input 2 for 1 Agent: `I seek wisdom, what is the most, wisest and knowledgeable, thing you know of? `
-- Test input 1 for 2 Agents: `Hello, you look wise for a llama, are you a wise llama, that knows wise things? And what a cute looking little bird, what is that song your whistling?`
+- Test input 1 for 2 Agents: `Oh, a llama with a bluebird on its black, you two look like a, wise and jovial, group, I think I will relax here for a moment.`
 
 ### File Structure
 - Initial File Structure...
