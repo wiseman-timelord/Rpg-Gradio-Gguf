@@ -39,7 +39,7 @@ agent1_name: str = "Wise-Llama"
 agent1_role: str = "A wise oracle llama"
 
 agent2_name: str = "Blue-Bird"
-agent2_role: str = "A bird speaking in songs"
+agent2_role: str = "A jovial song bird"
 
 agent3_name: str = ""
 agent3_role: str = ""
