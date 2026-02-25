@@ -285,11 +285,8 @@ Test input 2 for 2 Agents: `Well it is early, but do you two have any plans yet,
 
 ### Development
 The current plan for work featured is...
-- The logic of the, "Send Input" and "Cancel Response", button visibility, needs assessment/fixing. After complete rotation the Send Message box is visible again, but the Cancel Response button is not hidden at that point. Only either Send Input or Cancel Response, should be shown, one or the other, appropriately, and not both at same time shown. 
-- Could do with replacing Send Message box to be replaced with dynamic flow diagram of current prompting stages.
+- Could do with, upon clicking "Send Input", then temporary replacing Your Message box with dynamic flow diagram of current prompting stages, and then when the send input button re-appears, hide the flow diagram and make visible "Your Message" box when it is the user's turn to produce input again. So it would follow the same visibility switches as the visibility of, Send Message and Cancel Response, buttons.
 - Could do with a Info/Debug page to show if the model is loaded and possibly a runonce on page load System Ram usage assessment.
-- Compatibility ranges assessment and update of requirements, OS/Python ranges for compatibility.
-- Expanding compatibility through cases of OS/Python, in installer packages/libraries and usage in the main program. This program is intended to be compatible with modern systems, hence I only really want compatibility for Windows 10-11 and python 3.12-3.13, in order to not bloat scripts. 
 
 ## DISCLAIMER:
 - It is advided not to run the scripts in Beta stage, and just wait for the full v2 release. The pictures now give a better idea of what to expect.
