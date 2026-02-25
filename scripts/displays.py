@@ -562,14 +562,15 @@ def chat_with_model(user_input: str, right_mode: str):
 
     yield (
         cfg.scenario_log,
-        cfg.consolidated_instance or "",
+        cfg.consolidated_instance or " ",
         cfg.session_history,
         image_path,
-        "Response generated with image." if image_path else "Response generated (image failed).",
-        "",
+         "Response generated with image. " if image_path else "Response generated (image failed). ",
+         " ",
         list(reversed(cfg.session_image_paths)),
         *_restore_buttons(),
     )
+    return 
 
 
 # -----------------------------------------------------------------------
@@ -1069,7 +1070,7 @@ def launch_gradio_interface() -> str | None:
                 # reliably apply UI updates from the final yield; the .then()
                 # ensures Cancel is always hidden once the pipeline is done.
                 send_btn.click(
-                    fn=chat_with_model,
+                     fn=chat_with_model,
                     inputs=[user_input, right_panel_state],
                     outputs=[
                         bot_response,
@@ -1082,10 +1083,6 @@ def launch_gradio_interface() -> str | None:
                         send_btn,
                         cancel_btn,
                     ],
-                ).then(
-                    fn=lambda: (gr.update(visible=True), gr.update(visible=False)),
-                    inputs=[],
-                    outputs=[send_btn, cancel_btn],
                 )
 
                 # ── Cancel response ───────────────────────────────────────
