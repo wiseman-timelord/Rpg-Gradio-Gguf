@@ -174,6 +174,35 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 
 </details>
 
+<details>
+<summary>- The Batch Menu...</summary>
+    
+    ===============================================================================
+        Rpg-Gradio-Gguf - Main Menu
+    ===============================================================================
+    
+    
+    
+    
+    
+    
+        1. Launch Rpg-Gradio-Gguf
+    
+        2. Launch Rpg-Gradio-Gguf (Debug)
+    
+        3. Run Install/Refresh
+    
+    
+    
+    
+    
+    
+    ===============================================================================
+    Selection; Menu Option = 1-3, Exit Batch = X:
+    
+    
+</details>
+
 ### Requirements
 - Windows - Without proper assessment of the scripts, its Windows 10.
 - Python - Without proper assessment of the scripts, its Python 3.12.
