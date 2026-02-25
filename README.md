@@ -276,8 +276,7 @@ Here is some info about the modesls...
 
 ### Development
 The current plan for work featured is...
-- Testing and Bugfixing, the current error is with the models, so models are having a rethink/improve, see models section.
-- The new image model needs an ae.safetensors file, this seems to be the norm now, to require a safetensors file. We can put this in the installer with download progress indication and resume, as its only ~350MB, then when setting the image model folder, the program would check if the ae file is in the same folder, and if not, then copy the ae.safetensors to the model folder.
+- The logic of the, "Send Input" and "Cancel Response", button visibility, needs assessment/fixing. After complete rotation the Send Message box is visible again, but the Cancel Response button is not hidden at that point. Only either Send Input or Cancel Response, should be shown, one or the other, appropriately, and not both at same time shown. 
 - Could do with a new row on the conversation page, to display prompting stages and if the model is loaded and possibly cpu/ram usage.
 
 ## DISCLAIMER:
