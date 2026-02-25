@@ -241,6 +241,7 @@ Here is some info about the modesls...
 - Test input 1 for 1 Agent: `Hello, you look wise for a llama, are you a wise llama, that knows wise things?`
 - Test input 2 for 1 Agent: `I seek wisdom, what is the most, wisest and knowledgeable, thing you know of? `
 - Test input 1 for 2 Agents: `Oh, a llama with the accompaniment of a bluebird, you two look like a wise and jovial enough group, I think I will relax here for a moment with you.`
+- Test input 2 for 2 Agents: `Well it is early, but do you two have any plans yet, it looks like its going to be a fine day.`
 
 ### File Structure
 - Initial File Structure...
@@ -269,7 +270,6 @@ Here is some info about the modesls...
 ├── models/                    # Defualt directory for model files, though user may specify location. 
 ```
 
- 
 ### Development
 The current plan for work featured is...
 - Testing and Bugfixing, the current error is with the models, so models are having a rethink/improve, see models section.
