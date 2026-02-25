@@ -1,5 +1,5 @@
 # Rpg-Gradio-Gguf
-- Status: Working - Prompting was fixed, and now images are generating more accurately towards the, scenario and actors present. Still some GUI issues, and planned expansion. 
+- Status: Working - Prompting was fixed, and now images are generating more accurately towards the, scenario and actors present. Still some planned expansion/improvements, and deep testing/improvement, but for now its working quite well (see images). 
 
 ### Description
 Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf models to simulate limitless roleplaing in a Gradio interface in Web-Browser interface.
