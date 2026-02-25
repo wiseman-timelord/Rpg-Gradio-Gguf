@@ -71,7 +71,7 @@ DEFAULT_CONFIG = {
 
     # --- Agent 2 ---
     "agent2_name": "Blue-Bird",
-    "agent2_role": "A bird speaking in songs",
+    "agent2_role": "A jovial song bird",
 
     # --- Agent 3 (inactive by default — blank name disables it) ---
     "agent3_name": "",
