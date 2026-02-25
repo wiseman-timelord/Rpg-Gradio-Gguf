@@ -31,6 +31,20 @@ user_turn_start_time: float | None = None   # None  → not user's turn yet
 cancel_processing: bool = False
 
 # ---------------------------------------------------------------------------
+# Workflow Progress Tracking
+# ---------------------------------------------------------------------------
+WORKFLOW_STAGES: list[str] = [
+    "Initial Preparation",
+    "Character Responses",
+    "Instance Summary",
+    "History Consolidation",
+    "Encoding Prompt",
+    "Image Generation",
+]
+workflow_stage_index: int = -1  # -1 = idle, 0-5 = active stage
+workflow_completed_stages: list[int] = []  # Track completed stages
+
+# ---------------------------------------------------------------------------
 # Agent fields  (up to 3 agents; empty/None means agent is inactive)
 # ---------------------------------------------------------------------------
 GENDER_OPTIONS: list[str] = ["None", "Male", "Female"]

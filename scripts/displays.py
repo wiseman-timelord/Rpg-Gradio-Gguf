@@ -1,32 +1,25 @@
 # scripts/displays.py
 # Gradio UI: Conversation tab and Configuration tab.
-#
 # The Gradio server always starts non-blocking and returns a local URL.
 # launcher.py is responsible for opening the pywebview window that points
 # at this URL, and for the shutdown/exit lifecycle.
-#
 # UPDATED: When the image model folder is changed (browse or save),
 # ae.safetensors is automatically copied into the new folder if missing.
-#
 # LAYOUT (Conversation tab)
 # ─────────────────────────
 # Left column  — "Engagement" radio: Interactions | Happenings | Personalize
-#   • Interactions  : Scenario Log + Your Message + Send / Cancel Response
-#   • Happenings    : Consolidated History  (no Restart button here)
-#   • Personalize   : RP settings form
-#
+# • Interactions  : Scenario Log + Your Message + Send / Cancel Response
+# • Happenings    : Consolidated History  (no Restart button here)
+# • Personalize   : RP settings form
 # Right column — "Visualizer" radio: No Generation | Z-Image-Turbo
-#   • No Generation  : shows default/last image; skips all image-gen steps
-#   • Z-Image-Turbo  : full pipeline (image prompt → generate image)
-#
+# • No Generation  : shows default/last image; skips all image-gen steps
+# • Z-Image-Turbo  : full pipeline (image prompt → generate image)
 # Status bar row (below both columns):
-#   [Status textbox ............] [Restart Session] [Exit Program]
-#
+# [Status textbox ............] [Restart Session] [Exit Program]
 # Send/Cancel toggle:
-#   Clicking Send hides the Send button and shows Cancel Response.
-#   Clicking Cancel sets cfg.cancel_processing = True and re-shows Send.
-#   Each inference step in chat_with_model checks the flag before starting.
-#
+# Clicking Send hides the Send button and shows Cancel Response.
+# Clicking Cancel sets cfg.cancel_processing = True and re-shows Send.
+# Each inference step in chat_with_model checks the flag before starting.
 # Image generation is ONLY triggered when the Visualizer is set to
 # "Z-Image-Turbo".  "Your Message" input is cleared after submit.
 # Personalize panel uses default_history (saved template) separately
@@ -34,11 +27,11 @@
 # Restore RP Defaults resets to hardcoded installer defaults and saves.
 # Browser spellcheck context-menu is enabled on all text inputs.
 
+# Imports
 import os
 import time
 import threading
 import gradio as gr
-
 from scripts import configure as cfg
 from scripts.utilities import (
     reset_session_state,
@@ -56,13 +49,33 @@ from scripts.inference import (
     get_active_agents,
 )
 
-
 # -----------------------------------------------------------------------
 # Run hardware detection once at import time
 # -----------------------------------------------------------------------
 cfg.DETECTED_GPUS = detect_gpus()
 cfg.DETECTED_CPUS = detect_cpus()
 
+# -----------------------------------------------------------------------
+# Workflow Progress Visualization Helper
+# -----------------------------------------------------------------------
+def build_workflow_visualization(current_stage: int, completed_stages: list[int]) -> str:
+    """
+    Build a visual representation of the workflow progress.
+    ✓ = completed, ★ = currently processing, ○ = pending
+    """
+    stages = cfg.WORKFLOW_STAGES
+    lines = []
+    
+    for idx, stage in enumerate(stages):
+        if idx in completed_stages:
+            icon = "✓"
+        elif idx == current_stage:
+            icon = "★"
+        else:
+            icon = "○"
+        lines.append(f"{icon} {stage}")
+    
+    return "\n".join(lines)
 
 # -----------------------------------------------------------------------
 # Callbacks
@@ -70,7 +83,6 @@ cfg.DETECTED_CPUS = detect_cpus()
 def shutdown() -> None:
     """
     Request application shutdown.
-
     Delegates to cfg.shutdown_fn which is set by launcher.py at startup.
     That function destroys the pywebview window, which unblocks
     webview.start() in launcher.py, leading to os._exit(0).
@@ -78,395 +90,418 @@ def shutdown() -> None:
     if cfg.shutdown_fn is not None:
         cfg.shutdown_fn()
     else:
-        # Safety fallback — should never happen in normal operation
         print("WARNING: shutdown_fn not registered. Force exiting.")
         os._exit(1)
-
 
 def reset_session():
     """Reload config defaults and clear session state."""
     cfg.load_config()
     reset_session_state()
-    cfg.consolidated_instance = ""
-    placeholder = "./data/new_session.jpg"
+    cfg.consolidated_instance = " "
+    cfg.workflow_stage_index = -1
+    cfg.workflow_completed_stages = []
+    placeholder = "./data/new_session.jpg "
     if not os.path.exists(placeholder):
         placeholder = None
-    # Returns: instance_display (clear), session_display, bot_response,
-    #          generated_image, conv_status, user_input (clear),
-    #          sequence_gallery (clear — newest first)
-    return "", cfg.session_history, "", placeholder, "Session restarted.", "", []
-
+    
+    workflow_viz = build_workflow_visualization(-1, [])
+    
+    return (
+        " ", cfg.session_history, " ", placeholder, "Session restarted. ",
+        gr.update(value=" ", visible=True),
+        [],
+        gr.update(visible=True),
+        gr.update(visible=False),
+        gr.update(value=workflow_viz, visible=False),
+        False,  # is_processing state
+    )
 
 def cancel_response():
     """
     Signal the current inference pipeline to abort.
-
     Sets cfg.cancel_processing = True so that each subsequent call to
     prompt_response() or generate_image() in the pipeline skips its work.
     Also restores the Send / Cancel button visibility immediately.
-
-    Returns (status_text, send_btn_update, cancel_btn_update).
     """
     cfg.cancel_processing = True
     return (
         "Cancelling…",
-        gr.update(visible=True),   # show Send Message
-        gr.update(visible=False),  # hide Cancel Response
+        gr.update(visible=True),
+        gr.update(visible=False),
+        True,  # is_processing stays True until pipeline fully exits
     )
 
-
 def filter_model_output(raw: str, agent_name: str | None = None) -> str:
-    """Prefix the responding agent name if the model didn't already include it.
-
-    Parameters
-    ----------
-    agent_name : str, optional
-        The name to prefix.  Falls back to cfg.agent1_name when not supplied
-        (preserves backward compatibility with any external callers).
-    """
+    """Prefix the responding agent name if the model didn't already include it."""
     name = (agent_name or cfg.agent1_name or "Agent").strip()
     if ":" in raw[:40]:
         _, _, after = raw.partition(":")
         return f"{name}: {after.strip()}"
     return f"{name}: {raw}"
 
-
-def chat_with_model(user_input: str, right_mode: str):
+def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
     """
     Main conversation loop: converse → consolidate → [image_prompt → image].
-
-    Image generation (steps 3 & 4) is only performed when right_mode is
-    "Z-Image-Turbo".  When right_mode is "No Generation" the pipeline stops
-    after consolidation and keeps the existing latest_image_path on screen.
-
-    This is a **generator** — it yields partial updates at each pipeline
-    stage so the Gradio UI refreshes progressively instead of blocking
-    until the entire pipeline finishes.
-
-    Yields 9 values every iteration:
+    
+    Yields 11 values every iteration:
         (scenario_log, instance_display, session_history, image, status,
-         user_input, sequence_gallery, send_btn_update, cancel_btn_update)
-
-    While the pipeline is running the Send button is hidden and the Cancel
-    Response button is visible.  Both are restored before the generator
-    returns so the user can type another message.
-
-    cfg.cancel_processing is reset to False at the start of each call and
-    is set to True by cancel_response() when the user clicks Cancel.  Each
-    inference step checks the flag before starting; if set, remaining steps
-    are skipped and control is returned to the user.
+         user_input_update, sequence_gallery, send_btn_update, cancel_btn_update,
+         workflow_progress_update, is_processing_update)
     """
 
-    # Convenience aliases for button update tuples
     _SEND_HIDDEN   = gr.update(visible=False)
     _SEND_VISIBLE  = gr.update(visible=True)
     _CANCEL_HIDDEN = gr.update(visible=False)
     _CANCEL_VISIBLE = gr.update(visible=True)
 
     def _restore_buttons():
-        """Return (send_update, cancel_update) that restore the normal state."""
         return _SEND_VISIBLE, _CANCEL_HIDDEN
 
-    # Reset cancel flag for this new turn
+    def _start_stage(stage_idx: int) -> str:
+        """Mark the PREVIOUS stage as complete, then set current stage as active."""
+        if cfg.workflow_stage_index >= 0 and cfg.workflow_stage_index not in cfg.workflow_completed_stages:
+            cfg.workflow_completed_stages.append(cfg.workflow_stage_index)
+        cfg.workflow_stage_index = stage_idx
+        return build_workflow_visualization(cfg.workflow_stage_index, cfg.workflow_completed_stages)
+
+    def _complete_all_stages() -> str:
+        """Mark all stages as complete and return visualization."""
+        for idx in range(len(cfg.WORKFLOW_STAGES)):
+            if idx not in cfg.workflow_completed_stages:
+                cfg.workflow_completed_stages.append(idx)
+        cfg.workflow_stage_index = -1
+        return build_workflow_visualization(-1, cfg.workflow_completed_stages)
+
     cfg.cancel_processing = False
+    cfg.workflow_stage_index = -1
+    cfg.workflow_completed_stages = []
 
-    # ── Empty input guard — never hide Send or alter the Scenario Log ─────
+    # Empty input guard
     if not user_input.strip():
+        workflow_viz = build_workflow_visualization(-1, [])
         yield (
-            cfg.scenario_log or "",          # preserve Scenario Log exactly
-            cfg.consolidated_instance or "",
-            cfg.session_history or "",
+            cfg.scenario_log or " ",
+            cfg.consolidated_instance or " ",
+            cfg.session_history or " ",
             cfg.latest_image_path,
-            "Please type a message first.",
-            user_input,                      # keep whatever the user typed
-            list(reversed(cfg.session_image_paths)),
-            _SEND_VISIBLE,                   # Send stays visible
-            _CANCEL_HIDDEN,                  # Cancel stays hidden
-        )
-        return
-
-    # ── Pre-flight: verify model files exist before touching any session state
-    # This runs BEFORE hiding the Send button so that a misconfigured model
-    # folder never leaves the UI in a broken button state.
-    need_image = (right_mode == "Z-Image-Turbo")
-
-    if not scan_for_gguf(cfg.text_model_folder):
-        # Text model is always required — fail immediately, keep buttons intact.
-        yield (
-            cfg.scenario_log or "",
-            cfg.consolidated_instance or "",
-            cfg.session_history or "",
-            cfg.latest_image_path,
-            "No text model found. Check Configuration → Text Model Folder.",
-            user_input,                      # preserve user's typed message
+            "Please type a message first. ",
+            gr.update(value=user_input, visible=True),
             list(reversed(cfg.session_image_paths)),
             _SEND_VISIBLE,
             _CANCEL_HIDDEN,
+            gr.update(value=workflow_viz, visible=False),
+            False,  # is_processing
+        )
+        return
+
+    need_image = (right_mode == "Z-Image-Turbo")
+
+    if not scan_for_gguf(cfg.text_model_folder):
+        workflow_viz = build_workflow_visualization(-1, [])
+        yield (
+            cfg.scenario_log or " ",
+            cfg.consolidated_instance or " ",
+            cfg.session_history or " ",
+            cfg.latest_image_path,
+            "No text model found. Check Configuration → Text Model Folder. ",
+            gr.update(value=user_input, visible=True),
+            list(reversed(cfg.session_image_paths)),
+            _SEND_VISIBLE,
+            _CANCEL_HIDDEN,
+            gr.update(value=workflow_viz, visible=False),
+            False,
         )
         return
 
     if need_image and not scan_for_gguf(cfg.image_model_folder):
-        # Image model required for Z-Image-Turbo — fail immediately.
+        workflow_viz = build_workflow_visualization(-1, [])
         yield (
-            cfg.scenario_log or "",
-            cfg.consolidated_instance or "",
-            cfg.session_history or "",
+            cfg.scenario_log or " ",
+            cfg.consolidated_instance or " ",
+            cfg.session_history or " ",
             cfg.latest_image_path,
-            "No image model found. Check Configuration → Image Model Folder, "
-            "or switch Visualizer to 'No Generation'.",
-            user_input,                      # preserve user's typed message
+            "No image model found. Check Configuration → Image Model Folder,  "
+            "or switch Visualizer to 'No Generation'. ",
+            gr.update(value=user_input, visible=True),
             list(reversed(cfg.session_image_paths)),
             _SEND_VISIBLE,
             _CANCEL_HIDDEN,
+            gr.update(value=workflow_viz, visible=False),
+            False,
         )
         return
 
-    # Clear the idle timer — it is now the model's turn, not the user's.
     cfg.user_turn_start_time = None
 
-    # ── Lazy-load / verify models before touching any session state ───────
-    # Trigger a load check when:
-    #   • the text model is not yet loaded (always required), OR
-    #   • the image model is not yet loaded AND this turn needs it.
-    # This also catches the case where the text model is loaded but the
-    # image model was never loaded (or was idle-unloaded) while the
-    # Visualizer is set to "Z-Image-Turbo".
     models_need_check = (
         not cfg.text_model_loaded
         or (need_image and not cfg.image_model_loaded)
     )
     if models_need_check:
+        workflow_viz = _start_stage(0)
         yield (
-            cfg.scenario_log or "",
-            cfg.consolidated_instance or "",
-            cfg.session_history or "",
+            cfg.scenario_log or " ",
+            cfg.consolidated_instance or " ",
+            cfg.session_history or " ",
             cfg.latest_image_path,
-            "Loading models… please wait.",
-            "",                              # clear input — user message is sending
+            "Loading models… please wait. ",
+            gr.update(value=" ", visible=False),
             list(reversed(cfg.session_image_paths)),
             _SEND_HIDDEN,
             _CANCEL_VISIBLE,
+            gr.update(value=workflow_viz, visible=True),
+            True,  # is_processing
         )
         ok, load_msg = ensure_models_loaded(need_image=need_image)
         if not ok:
             cfg.user_turn_start_time = time.time()
-            # Restore everything — the status bar carries the descriptive error.
+            cfg.workflow_stage_index = -1
+            cfg.workflow_completed_stages = []
+            workflow_viz = build_workflow_visualization(-1, [])
             yield (
-                cfg.scenario_log or "",
-                cfg.consolidated_instance or "",
-                cfg.session_history or "",
+                cfg.scenario_log or " ",
+                cfg.consolidated_instance or " ",
+                cfg.session_history or " ",
                 cfg.latest_image_path,
                 load_msg,
-                "",
+                gr.update(value=" ", visible=True),
                 list(reversed(cfg.session_image_paths)),
                 *_restore_buttons(),
+                gr.update(value=workflow_viz, visible=False),
+                False,  # is_processing
             )
             return
 
     cfg.human_input = user_input.strip()
+    cfg.scenario_log = (cfg.scenario_log + f"\n{cfg.human_name}: {cfg.human_input} ").lstrip()
 
-    # Append the user's line to the running scenario log immediately
-    cfg.scenario_log = (cfg.scenario_log + f"\n{cfg.human_name}: {cfg.human_input}").lstrip()
-
-    # Show the user's line right away — clear the input box — show Cancel
+    workflow_viz = _start_stage(0)
     yield (
         cfg.scenario_log,
-        cfg.consolidated_instance or "",
+        cfg.consolidated_instance or " ",
         cfg.session_history,
         cfg.latest_image_path,
-        "Generating response…",
-        "",                              # clear user input
+        "Generating response… ",
+        gr.update(value=" ", visible=False),
         list(reversed(cfg.session_image_paths)),
         _SEND_HIDDEN,
         _CANCEL_VISIBLE,
+        gr.update(value=workflow_viz, visible=True),
+        True,  # is_processing
     )
 
-    # --- Step 1: converse — one inference call per active agent ------------------
-    # get_active_agents() returns only agents with non-blank names, in slot
-    # order (Agent 1 → 2 → 3), with a single fallback entry when none are set.
     active_agents = get_active_agents()
-    exchange_lines: list[str] = []   # accumulates "AgentName: response" lines
+    exchange_lines: list[str] = []
 
     for agent_name, agent_role in active_agents:
-
         if cfg.cancel_processing:
             cfg.user_turn_start_time = time.time()
+            cfg.workflow_stage_index = -1
+            cfg.workflow_completed_stages = []
+            workflow_viz = build_workflow_visualization(-1, [])
             yield (
                 cfg.scenario_log,
-                cfg.consolidated_instance or "",
+                cfg.consolidated_instance or " ",
                 cfg.session_history,
                 cfg.latest_image_path,
-                "Response cancelled.",
-                "",
+                "Response cancelled. ",
+                gr.update(value=" ", visible=True),
                 list(reversed(cfg.session_image_paths)),
                 *_restore_buttons(),
+                gr.update(value=workflow_viz, visible=False),
+                False,  # is_processing
             )
             return
 
-        # Inform the user which agent is thinking
         agent_count = len(active_agents)
         if agent_count > 1:
-            status_msg = f"Generating response… ({agent_name})"
+            status_msg = f"Generating response… ({agent_name}) "
         else:
-            status_msg = "Generating response…"
+            status_msg = "Generating response… "
 
+        workflow_viz = _start_stage(1)
         yield (
             cfg.scenario_log,
-            cfg.consolidated_instance or "",
+            cfg.consolidated_instance or " ",
             cfg.session_history,
             cfg.latest_image_path,
             status_msg,
-            "",
+            gr.update(value=" ", visible=False),
             list(reversed(cfg.session_image_paths)),
             _SEND_HIDDEN,
             _CANCEL_VISIBLE,
+            gr.update(value=workflow_viz, visible=True),
+            True,  # is_processing
         )
 
         result = prompt_response("converse", responding_agent=(agent_name, agent_role))
 
         if cfg.cancel_processing or result.get("cancelled"):
             cfg.user_turn_start_time = time.time()
+            cfg.workflow_stage_index = -1
+            cfg.workflow_completed_stages = []
+            workflow_viz = build_workflow_visualization(-1, [])
             yield (
                 cfg.scenario_log,
-                cfg.consolidated_instance or "",
+                cfg.consolidated_instance or " ",
                 cfg.session_history,
                 cfg.latest_image_path,
-                "Response cancelled.",
-                "",
+                "Response cancelled. ",
+                gr.update(value=" ", visible=True),
                 list(reversed(cfg.session_image_paths)),
                 *_restore_buttons(),
+                gr.update(value=workflow_viz, visible=False),
+                False,  # is_processing
             )
             return
 
         if "error" in result:
             cfg.user_turn_start_time = time.time()
+            cfg.workflow_stage_index = -1
+            cfg.workflow_completed_stages = []
+            workflow_viz = build_workflow_visualization(-1, [])
             yield (
                 cfg.scenario_log,
-                cfg.consolidated_instance or "",
+                cfg.consolidated_instance or " ",
                 cfg.session_history,
                 cfg.latest_image_path,
-                f"Converse error ({agent_name}): {result['error']}",
-                "",
+                f"Converse error ({agent_name}): {result['error']} ",
+                gr.update(value=" ", visible=True),
                 list(reversed(cfg.session_image_paths)),
                 *_restore_buttons(),
+                gr.update(value=workflow_viz, visible=False),
+                False,  # is_processing
             )
             return
 
-        # Format and append this agent's line
         formatted_line = filter_model_output(result["agent_response"], agent_name=agent_name)
         exchange_lines.append(formatted_line)
-        cfg.scenario_log = cfg.scenario_log + f"\n{formatted_line}"
+        cfg.scenario_log = cfg.scenario_log + f"\n{formatted_line} "
 
-        # Show this agent's line in the UI immediately before moving to
-        # the next agent, so dialogue streams in naturally.
         yield (
             cfg.scenario_log,
-            cfg.consolidated_instance or "",
+            cfg.consolidated_instance or " ",
             cfg.session_history,
             cfg.latest_image_path,
             status_msg,
-            "",
+            gr.update(value=" ", visible=False),
             list(reversed(cfg.session_image_paths)),
             _SEND_HIDDEN,
             _CANCEL_VISIBLE,
+            gr.update(value=workflow_viz, visible=True),
+            True,  # is_processing
         )
 
-    # Expose the combined exchange for the consolidate / instance steps.
-    # agent_output keeps the last agent's raw line (legacy compat);
-    # agent_exchange holds the full multi-agent block.
-    cfg.agent_output   = exchange_lines[-1] if exchange_lines else ""
+    cfg.agent_output = exchange_lines[-1] if exchange_lines else " "
     cfg.agent_exchange = "\n".join(exchange_lines)
 
-    # --- Step 2a: instance — visual snapshot of this rotation ----------------
-    # Runs before consolidate so the image pipeline can use the result.
     if cfg.cancel_processing:
         cfg.user_turn_start_time = time.time()
+        cfg.workflow_stage_index = -1
+        cfg.workflow_completed_stages = []
+        workflow_viz = build_workflow_visualization(-1, [])
         yield (
             cfg.scenario_log,
-            cfg.consolidated_instance or "",
+            cfg.consolidated_instance or " ",
             cfg.session_history,
             cfg.latest_image_path,
-            "Response cancelled.",
-            "",
+            "Response cancelled. ",
+            gr.update(value=" ", visible=True),
             list(reversed(cfg.session_image_paths)),
             *_restore_buttons(),
+            gr.update(value=workflow_viz, visible=False),
+            False,  # is_processing
         )
         return
 
+    workflow_viz = _start_stage(2)
     yield (
         cfg.scenario_log,
-        cfg.consolidated_instance or "",
+        cfg.consolidated_instance or " ",
         cfg.session_history,
         cfg.latest_image_path,
-        "Generating instance summary…",
-        "",
+        "Generating instance summary… ",
+        gr.update(value=" ", visible=False),
         list(reversed(cfg.session_image_paths)),
         _SEND_HIDDEN,
         _CANCEL_VISIBLE,
+        gr.update(value=workflow_viz, visible=True),
+        True,  # is_processing
     )
 
     instance_result = prompt_response("instance")
     if cfg.cancel_processing or instance_result.get("cancelled"):
         cfg.user_turn_start_time = time.time()
+        cfg.workflow_stage_index = -1
+        cfg.workflow_completed_stages = []
+        workflow_viz = build_workflow_visualization(-1, [])
         yield (
             cfg.scenario_log,
-            cfg.consolidated_instance or "",
+            cfg.consolidated_instance or " ",
             cfg.session_history,
             cfg.latest_image_path,
-            "Response cancelled.",
-            "",
+            "Response cancelled. ",
+            gr.update(value=" ", visible=True),
             list(reversed(cfg.session_image_paths)),
             *_restore_buttons(),
+            gr.update(value=workflow_viz, visible=False),
+            False,  # is_processing
         )
         return
 
     if "agent_response" in instance_result:
         cfg.consolidated_instance = instance_result["agent_response"]
 
-    # --- Step 2b: consolidate — update running narrative history -------------
+    workflow_viz = _start_stage(3)
     yield (
         cfg.scenario_log,
-        cfg.consolidated_instance or "",
+        cfg.consolidated_instance or " ",
         cfg.session_history,
         cfg.latest_image_path,
-        "Generating history…",
-        "",
+        "Generating history… ",
+        gr.update(value=" ", visible=False),
         list(reversed(cfg.session_image_paths)),
         _SEND_HIDDEN,
         _CANCEL_VISIBLE,
+        gr.update(value=workflow_viz, visible=True),
+        True,  # is_processing
     )
 
     consolidate = prompt_response("consolidate")
     if not cfg.cancel_processing and not consolidate.get("cancelled") and "error" not in consolidate:
         cfg.session_history = consolidate["agent_response"]
 
-    # ── Image generation — only when Visualizer mode is "Z-Image-Turbo" ──────────
     if cfg.cancel_processing or right_mode != "Z-Image-Turbo":
         cfg.user_turn_start_time = time.time()
-        status = "Response cancelled." if cfg.cancel_processing else "Response generated."
+        status = "Response cancelled. " if cfg.cancel_processing else "Response generated. "
+        workflow_viz = _complete_all_stages()
         yield (
             cfg.scenario_log,
-            cfg.consolidated_instance or "",
+            cfg.consolidated_instance or " ",
             cfg.session_history,
             cfg.latest_image_path,
             status,
-            "",
+            gr.update(value=" ", visible=True),
             list(reversed(cfg.session_image_paths)),
             *_restore_buttons(),
+            gr.update(value=workflow_viz, visible=False),
+            False,  # is_processing
         )
         return
 
-    # --- Step 3: generate the visual prompt --------------------------------------
+    workflow_viz = _start_stage(4)
     yield (
         cfg.scenario_log,
-        cfg.consolidated_instance or "",
+        cfg.consolidated_instance or " ",
         cfg.session_history,
         cfg.latest_image_path,
-        "Generating prompt…",
-        "",
+        "Generating prompt… ",
+        gr.update(value=" ", visible=False),
         list(reversed(cfg.session_image_paths)),
         _SEND_HIDDEN,
         _CANCEL_VISIBLE,
+        gr.update(value=workflow_viz, visible=True),
+        True,  # is_processing
     )
 
     visual_prompt = None
@@ -478,35 +513,41 @@ def chat_with_model(user_input: str, right_mode: str):
 
     if cfg.cancel_processing:
         cfg.user_turn_start_time = time.time()
+        cfg.workflow_stage_index = -1
+        cfg.workflow_completed_stages = []
+        workflow_viz = build_workflow_visualization(-1, [])
         yield (
             cfg.scenario_log,
-            cfg.consolidated_instance or "",
+            cfg.consolidated_instance or " ",
             cfg.session_history,
             cfg.latest_image_path,
-            "Response cancelled.",
-            "",
+            "Response cancelled. ",
+            gr.update(value=" ", visible=True),
             list(reversed(cfg.session_image_paths)),
             *_restore_buttons(),
+            gr.update(value=workflow_viz, visible=False),
+            False,  # is_processing
         )
         return
 
     if not visual_prompt:
-        visual_prompt = f"A scene at {cfg.scene_location}."
+        visual_prompt = f"A scene at {cfg.scene_location}. "
 
-    # --- Step 4: generate the image (threaded with progress polling) --------------
+    workflow_viz = _start_stage(5)
     yield (
         cfg.scenario_log,
-        cfg.consolidated_instance or "",
+        cfg.consolidated_instance or " ",
         cfg.session_history,
         cfg.latest_image_path,
-        "Generating image…",
-        "",
+        "Generating image… ",
+        gr.update(value=" ", visible=False),
         list(reversed(cfg.session_image_paths)),
         _SEND_HIDDEN,
         _CANCEL_VISIBLE,
+        gr.update(value=workflow_viz, visible=True),
+        True,  # is_processing
     )
 
-    # Run image generation in a background thread so we can poll progress
     _img_result: dict = {"path": None, "done": False}
 
     def _worker():
@@ -516,40 +557,43 @@ def chat_with_model(user_input: str, right_mode: str):
     thread = threading.Thread(target=_worker, daemon=True)
     thread.start()
 
-    # Poll progress and yield status updates every ~1 second.
-    # If cancel is requested, stop polling (the worker thread will check the
-    # flag itself at its next opportunity and return early).
     while not _img_result["done"]:
         if cfg.cancel_processing:
-            # Wait for the thread to finish cleanly then bail out
             thread.join()
             cfg.user_turn_start_time = time.time()
+            cfg.workflow_stage_index = -1
+            cfg.workflow_completed_stages = []
+            workflow_viz = build_workflow_visualization(-1, [])
             yield (
                 cfg.scenario_log,
-                cfg.consolidated_instance or "",
+                cfg.consolidated_instance or " ",
                 cfg.session_history,
                 cfg.latest_image_path,
-                "Response cancelled.",
-                "",
+                "Response cancelled. ",
+                gr.update(value=" ", visible=True),
                 list(reversed(cfg.session_image_paths)),
                 *_restore_buttons(),
+                gr.update(value=workflow_viz, visible=False),
+                False,  # is_processing
             )
             return
         step, total = get_image_gen_progress()
         if total > 0 and step > 0:
-            status = f"Generating image, step {step}/{total}…"
+            status = f"Generating image, step {step}/{total}… "
         else:
-            status = "Generating image…"
+            status = "Generating image… "
         yield (
             cfg.scenario_log,
-            cfg.consolidated_instance or "",
+            cfg.consolidated_instance or " ",
             cfg.session_history,
             cfg.latest_image_path,
             status,
-            "",
+            gr.update(value=" ", visible=False),
             list(reversed(cfg.session_image_paths)),
             _SEND_HIDDEN,
             _CANCEL_VISIBLE,
+            gr.update(value=workflow_viz, visible=True),
+            True,  # is_processing
         )
         time.sleep(1.0)
 
@@ -557,124 +601,135 @@ def chat_with_model(user_input: str, right_mode: str):
     image_path = _img_result["path"]
     cfg.latest_image_path = image_path
 
-    # Control returns to user — start the idle timer.
     cfg.user_turn_start_time = time.time()
-
+    workflow_viz = _complete_all_stages()
+    
     yield (
         cfg.scenario_log,
         cfg.consolidated_instance or " ",
         cfg.session_history,
         image_path,
-         "Response generated with image. " if image_path else "Response generated (image failed). ",
-         " ",
+        "Response complete! ",
+        gr.update(value=" ", visible=False),
+        list(reversed(cfg.session_image_paths)),
+        _SEND_HIDDEN,
+        _CANCEL_VISIBLE,
+        gr.update(value=workflow_viz, visible=True),
+        True,  # is_processing (still, for the 1s pause)
+    )
+    time.sleep(1.0)
+    
+    yield (
+        cfg.scenario_log,
+        cfg.consolidated_instance or " ",
+        cfg.session_history,
+        image_path,
+        "Response generated with image. " if image_path else "Response generated (image failed). ",
+        gr.update(value=" ", visible=True),
         list(reversed(cfg.session_image_paths)),
         *_restore_buttons(),
+        gr.update(value=workflow_viz, visible=False),
+        False,  # is_processing
     )
-    return 
-
+    return
 
 # -----------------------------------------------------------------------
 # Panel switching callbacks
 # -----------------------------------------------------------------------
-def switch_left_panel(mode: str):
-    """Toggle visibility of Interactions / Happenings / Personalize panels."""
-    return (
-        gr.update(visible=(mode == "Interactions")),
-        gr.update(visible=(mode == "Happenings")),
-        gr.update(visible=(mode == "Personalize")),
-    )
-
+def switch_left_panel(mode: str, is_processing: bool):
+    """
+    Toggle visibility of Interactions / Happenings / Personalize panels.
+    CRITICAL: When returning to Interactions, restore correct component
+    visibility based on is_processing state.
+    """
+    if is_processing:
+        # Processing state: hide user_input, show workflow_progress, hide send, show cancel
+        interaction_updates = (
+            gr.update(visible=True),  # interaction_panel itself
+            gr.update(visible=(mode == "Happenings")),
+            gr.update(visible=(mode == "Personalize")),
+            gr.update(visible=False),  # user_input
+            gr.update(visible=True),   # workflow_progress
+            gr.update(visible=False),  # send_btn
+            gr.update(visible=True),   # cancel_btn
+        )
+    else:
+        # Idle state: show user_input, hide workflow_progress, show send, hide cancel
+        interaction_updates = (
+            gr.update(visible=True),  # interaction_panel itself
+            gr.update(visible=(mode == "Happenings")),
+            gr.update(visible=(mode == "Personalize")),
+            gr.update(visible=True),   # user_input
+            gr.update(visible=False),  # workflow_progress
+            gr.update(visible=True),   # send_btn
+            gr.update(visible=False),  # cancel_btn
+        )
+    
+    return interaction_updates
 
 def switch_right_panel_and_state(mode: str):
-    """
-    Update the Visualizer mode state.
-
-    The right column is always the Visualizer (image display); only the
-    generation behaviour changes based on the selected mode.  No panel
-    visibility toggling is required — we just store the state so that
-    chat_with_model knows whether to run image generation.
-    """
+    """Update the Visualizer mode state."""
     return mode
-
 
 def on_gallery_select(evt: gr.SelectData):
     """When the user clicks a thumbnail in the Sequence strip, display it
-    in the Generated Image box.  The gallery value list is newest-first."""
+    in the Generated Image box."""
     if evt.value and isinstance(evt.value, dict):
-        # Gradio 4.x: evt.value is a dict with 'image'/'path' keys
         path = evt.value.get("image", {}).get("path") or evt.value.get("path")
         if path:
             return path
     elif evt.value and isinstance(evt.value, str):
         return evt.value
-    return gr.update()  # no change
-
+    return gr.update()
 
 # -----------------------------------------------------------------------
-# Roleplay settings callbacks (Conversation tab — Personalize panel)
+# Roleplay settings callbacks
 # -----------------------------------------------------------------------
 def save_roleplay_settings(
-    a1_name, a1_role,
-    a2_name, a2_role,
-    a3_name, a3_role,
-    human, human_age, human_gender,
-    location, event_time, history,
+    a1_name, a1_role, a2_name, a2_role, a3_name, a3_role,
+    human, human_age, human_gender, location, event_time, history,
 ):
     """Save the roleplay parameters from the Personalize panel."""
     cfg.agent1_name = a1_name
     cfg.agent1_role = a1_role
-
     cfg.agent2_name = a2_name
     cfg.agent2_role = a2_role
-
     cfg.agent3_name = a3_name
     cfg.agent3_role = a3_role
-
     cfg.human_name   = human
     cfg.human_age    = str(human_age) if human_age is not None else ""
     cfg.human_gender = human_gender
-
     cfg.scene_location  = location
     cfg.event_time      = event_time
     cfg.default_history = history
     cfg.save_config()
     return "RP settings saved."
 
-
 def restore_roleplay_settings():
-    """Restore RP fields to the hardcoded installer defaults.
-
-    Writes the defaults to both the runtime globals AND persistent.json so
-    that subsequent startups also use the defaults.
-    """
+    """Restore RP fields to the hardcoded installer defaults."""
     d = cfg.DEFAULT_RP_SETTINGS
     cfg.agent1_name = d["agent1_name"]
     cfg.agent1_role = d["agent1_role"]
-
     cfg.agent2_name = d["agent2_name"]
     cfg.agent2_role = d["agent2_role"]
-
     cfg.agent3_name = d["agent3_name"]
     cfg.agent3_role = d["agent3_role"]
-
     cfg.human_name    = d["human_name"]
     cfg.human_age     = d["human_age"]
     cfg.human_gender  = d["human_gender"]
-
     cfg.scene_location = d["scene_location"]
     cfg.event_time     = d["event_time"]
     cfg.default_history = d["default_history"]
     cfg.save_config()
     return (
-        cfg.agent1_name,   cfg.agent1_role,
-        cfg.agent2_name,   cfg.agent2_role,
-        cfg.agent3_name,   cfg.agent3_role,
-        cfg.human_name,    cfg.human_age,     cfg.human_gender,
+        cfg.agent1_name, cfg.agent1_role,
+        cfg.agent2_name, cfg.agent2_role,
+        cfg.agent3_name, cfg.agent3_role,
+        cfg.human_name, cfg.human_age, cfg.human_gender,
         cfg.scene_location, cfg.event_time,
         cfg.default_history,
-        "RP defaults restored and saved.",
+        "RP defaults restored and saved. ",
     )
-
 
 # -----------------------------------------------------------------------
 # Configuration callbacks
@@ -683,24 +738,16 @@ def save_config_tab_settings(
     gpu_choice, vram, cpu_choice, threads, auto_unload, max_mem,
     img_sz, steps, samp, cfgs, neg, tf, imf,
 ):
-    """Save all Configuration-tab fields.  Roleplay values stay in sync
-    via the Personalize panel on the Conversation tab.
-
-    When the image model folder changes, ae.safetensors is automatically
-    copied into the new folder if it is not already present.
-    """
-
-    # Parse GPU index from dropdown string  "GPU0: Name (VRAM MB)"
+    """Save all Configuration-tab fields."""
     try:
-        cfg.selected_gpu = int(gpu_choice.split(":")[0].replace("GPU", ""))
+        cfg.selected_gpu = int(gpu_choice.split(": ")[0].replace("GPU", ""))
     except (ValueError, AttributeError):
         cfg.selected_gpu = 0
 
     cfg.vram_assigned = int(vram)
 
-    # Parse CPU index
     try:
-        cfg.selected_cpu = int(cpu_choice.split(":")[0].replace("CPU", ""))
+        cfg.selected_cpu = int(cpu_choice.split(": ")[0].replace("CPU", ""))
     except (ValueError, AttributeError):
         cfg.selected_cpu = 0
 
@@ -716,31 +763,25 @@ def save_config_tab_settings(
     cfg.default_negative_prompt = neg
     cfg.text_model_folder = tf
 
-    # --- Image model folder: auto-copy ae.safetensors if needed ---
     old_image_folder = cfg.image_model_folder
     cfg.image_model_folder = imf
 
-    vae_status = ""
+    vae_status = " "
     if imf and os.path.isdir(imf):
         vae_result = ensure_vae_in_image_folder(imf)
         if vae_result:
-            vae_status = " ae.safetensors confirmed."
+            vae_status = " ae.safetensors confirmed. "
         else:
-            vae_status = " WARNING: ae.safetensors missing — re-run installer."
+            vae_status = " WARNING: ae.safetensors missing — re-run installer. "
 
     cfg.save_config()
-    return f"Configuration saved.{vae_status}"
-
+    return f"Configuration saved.{vae_status} "
 
 def browse_text_folder(current: str) -> str:
     return browse_folder(current)
 
-
 def browse_image_folder(current: str) -> str:
-    """
-    Open folder picker for the image model folder.
-    After selection, automatically ensure ae.safetensors is present.
-    """
+    """Open folder picker for the image model folder."""
     chosen = browse_folder(current)
     if chosen and os.path.isdir(chosen):
         vae = ensure_vae_in_image_folder(chosen)
@@ -751,33 +792,21 @@ def browse_image_folder(current: str) -> str:
                   "Re-run the installer to download it.")
     return chosen
 
-
 # -----------------------------------------------------------------------
 # Layout
 # -----------------------------------------------------------------------
 def launch_gradio_interface() -> str | None:
-    """
-    Build and launch the Gradio Blocks interface.
+    """Build and launch the Gradio Blocks interface."""
 
-    The server always starts non-blocking (prevent_thread_lock=True) so
-    that launcher.py can open a pywebview window pointing at the URL.
-
-    Returns
-    -------
-    str | None
-        The local URL string, or None on failure.
-    """
-
-    # Pre-compute hardware display strings
     gpu_names = [
-        f"GPU{gpu['index']}: {gpu['name']} ({gpu['vram_mb']} MB VRAM)"
+        f"GPU{gpu['index']}: {gpu['name']} ({gpu['vram_mb']} MB VRAM) "
         for gpu in cfg.DETECTED_GPUS
     ] if cfg.DETECTED_GPUS else ["No GPUs detected"]
 
     valid_gpu_index = min(cfg.selected_gpu, len(gpu_names) - 1) if gpu_names else 0
 
     cpu_names = [
-        f"CPU{cpu['index']}: {cpu['name']} ({cpu['threads']} threads)"
+        f"CPU{cpu['index']}: {cpu['name']} ({cpu['threads']} threads) "
         for cpu in cfg.DETECTED_CPUS
     ] if cfg.DETECTED_CPUS else ["No CPUs detected"]
 
@@ -790,11 +819,8 @@ def launch_gradio_interface() -> str | None:
     )
     valid_threads = min(cfg.cpu_threads, max_threads)
 
-    # Custom JS to enable native browser spellcheck context-menu on all
-    # textareas and text inputs — allows right-click spelling suggestions.
     _SPELLCHECK_JS = """
     () => {
-        // Enable spellcheck on all textareas and text inputs
         function enableSpellcheck() {
             document.querySelectorAll('textarea, input[type="text"]').forEach(el => {
                 el.setAttribute('spellcheck', 'true');
@@ -802,25 +828,19 @@ def launch_gradio_interface() -> str | None:
             });
         }
         enableSpellcheck();
-        // Re-apply when Gradio dynamically adds new elements
         const observer = new MutationObserver(enableSpellcheck);
         observer.observe(document.body, { childList: true, subtree: true });
     }
     """
 
-    # Custom CSS for proper image scaling and gallery thumbnail sizing
     _CUSTOM_CSS = """
-    /* ── Generated Image: scale to fit, not stretch, smooth ── */
     #generated_image img {
         object-fit: contain !important;
         width: 100% !important;
-        height: 100% !important;
+        height: 100% !important; 
     }
-
-    /* ── Sequence gallery: single-row thumbnail strip ── */
     #sequence_gallery .grid-container,
     #sequence_gallery .grid-wrap {
-        /* Force thumbnails to fit within the gallery height */
         gap: 4px !important;
         overflow-x: auto !important;
         overflow-y: hidden !important;
@@ -828,7 +848,6 @@ def launch_gradio_interface() -> str | None:
     }
     #sequence_gallery .thumbnail-item,
     #sequence_gallery .thumbnail-lg {
-        /* Fixed thumbnail cells — square, fitting within 188px strip */
         min-width: 156px !important;
         max-width: 156px !important;
         min-height: 156px !important;
@@ -841,26 +860,23 @@ def launch_gradio_interface() -> str | None:
         width: 100% !important;
         height: 100% !important;
     }
+    #workflow_progress textarea {
+        font-family: 'Consolas', 'Courier New', monospace !important;
+        font-size: 13px !important;
+        line-height: 1.4 !important;
+    }
     """
 
-    with gr.Blocks(
-        title="Rpg-Gradio-Gguf",
-        js=_SPELLCHECK_JS,
-        css=_CUSTOM_CSS,
-    ) as interface:
+    with gr.Blocks(title="Rpg-Gradio-Gguf") as interface:
         gr.Markdown("# ⚔️ Rpg-Gradio-Gguf")
 
         with gr.Tabs():
-            # ==============================================================
-            # TAB 1 — Conversation
-            # ==============================================================
             with gr.Tab("Conversation"):
-
-                # State to track Visualizer mode for image-generation logic
                 right_panel_state = gr.State("Z-Image-Turbo")
+                # NEW: Track processing state for panel switching
+                is_processing_state = gr.State(False)
 
                 with gr.Row():
-                    # ── LEFT COLUMN ──────────────────────────────────────
                     with gr.Column(scale=1):
                         left_mode = gr.Radio(
                             choices=["Interactions", "Happenings", "Personalize"],
@@ -869,147 +885,106 @@ def launch_gradio_interface() -> str | None:
                             interactive=True,
                         )
 
-                        # -- Interactions panel --
                         with gr.Column(visible=True) as interaction_panel:
                             bot_response = gr.Textbox(
-                                label="Scenario Log",
+                                label="Scenario Log ",
                                 lines=16,
                                 interactive=False,
                             )
                             user_input = gr.Textbox(
-                                label="Your Message",
+                                label="Your Message ",
                                 lines=6,
-                                placeholder="Type your message here...",
+                                placeholder="Type your message here... ",
                                 interactive=True,
+                                visible=True,
                             )
-                            send_btn = gr.Button("Send Message", visible=True)
+                            workflow_progress = gr.Textbox(
+                                label="Workflow Progress ",
+                                lines=6,
+                                value=build_workflow_visualization(-1, []),
+                                interactive=False,
+                                visible=False,
+                                elem_id="workflow_progress",
+                            )
+                            send_btn = gr.Button("Send Message ", visible=True)
                             cancel_btn = gr.Button(
-                                "Cancel Response", variant="stop", visible=False
+                                "Cancel Response ", variant="stop", visible=False
                             )
 
-                        # -- Happenings panel (Consolidated Instance + Consolidated History) --
                         with gr.Column(visible=False) as happenings_panel:
                             instance_display = gr.Textbox(
-                                label="Consolidated Instance",
+                                label="Consolidated Instance ",
                                 lines=6,
                                 value=cfg.consolidated_instance,
                                 interactive=False,
-                                info="Visual snapshot of the most recent exchange — used for image generation.",
+                                info="Visual snapshot of the most recent exchange — used for image generation. ",
                             )
                             session_display = gr.Textbox(
-                                label="Consolidated History",
+                                label="Consolidated History ",
                                 lines=18,
                                 value=cfg.session_history,
                                 interactive=False,
                             )
 
-                        # -- Personalize panel --
                         with gr.Column(visible=False) as personalize_panel:
-
-                            # Row 1: Agent Names
                             with gr.Row():
-                                rp_agent1_name = gr.Textbox(
-                                    label="Agent 1 Name",
-                                    value=cfg.agent1_name,
-                                )
-                                rp_agent2_name = gr.Textbox(
-                                    label="Agent 2 Name",
-                                    value=cfg.agent2_name,
-                                )
-                                rp_agent3_name = gr.Textbox(
-                                    label="Agent 3 Name",
-                                    value=cfg.agent3_name,
-                                )
-
-                            # Row 2: Agent Roles
+                                rp_agent1_name = gr.Textbox(label="Agent 1 Name ", value=cfg.agent1_name)
+                                rp_agent2_name = gr.Textbox(label="Agent 2 Name ", value=cfg.agent2_name)
+                                rp_agent3_name = gr.Textbox(label="Agent 3 Name ", value=cfg.agent3_name)
                             with gr.Row():
-                                rp_agent1_role = gr.Textbox(
-                                    label="Agent 1 Role",
-                                    value=cfg.agent1_role,
-                                )
-                                rp_agent2_role = gr.Textbox(
-                                    label="Agent 2 Role",
-                                    value=cfg.agent2_role,
-                                )
-                                rp_agent3_role = gr.Textbox(
-                                    label="Agent 3 Role",
-                                    value=cfg.agent3_role,
-                                )
-
-                            # Row 3: Human Name / Age / Gender
+                                rp_agent1_role = gr.Textbox(label="Agent 1 Role ", value=cfg.agent1_role)
+                                rp_agent2_role = gr.Textbox(label="Agent 2 Role ", value=cfg.agent2_role)
+                                rp_agent3_role = gr.Textbox(label="Agent 3 Role ", value=cfg.agent3_role)
                             with gr.Row():
-                                rp_human_name = gr.Textbox(
-                                    label="Human Name",
-                                    value=cfg.human_name,
-                                )
+                                rp_human_name = gr.Textbox(label="Human Name ", value=cfg.human_name)
                                 rp_human_age = gr.Number(
-                                    label="Human Age",
+                                    label="Human Age ",
                                     value=int(cfg.human_age) if cfg.human_age and cfg.human_age.strip().isdigit() else None,
-                                    precision=0,
-                                    minimum=0,
-                                    maximum=999,
+                                    precision=0, minimum=0, maximum=999,
                                 )
                                 rp_human_gender = gr.Dropdown(
-                                    label="Human Gender",
+                                    label="Human Gender ",
                                     choices=cfg.GENDER_OPTIONS,
                                     value=cfg.human_gender,
                                 )
-
-                            # Row 5: Scene Location / Event Time
                             with gr.Row():
-                                rp_scene_location = gr.Textbox(
-                                    label="Scene Location",
-                                    value=cfg.scene_location,
-                                )
+                                rp_scene_location = gr.Textbox(label="Scene Location ", value=cfg.scene_location)
                                 rp_event_time = gr.Textbox(
-                                    label="Event Time",
+                                    label="Event Time ",
                                     value=cfg.event_time,
-                                    placeholder="e.g. 16:20, 4:20pm, dawn — leave blank to omit",
+                                    placeholder="e.g. 16:20, 4:20pm, dawn — leave blank to omit ",
                                 )
-
                             rp_default_history = gr.Textbox(
-                                label="Starting Narrative",
+                                label="Starting Narrative ",
                                 value=cfg.default_history,
                                 lines=3,
                             )
                             with gr.Row():
-                                rp_save_btn = gr.Button(
-                                    "Save RP Settings", variant="primary"
-                                )
-                                rp_restore_btn = gr.Button(
-                                    "Restore RP Defaults", variant="stop"
-                                )
+                                rp_save_btn = gr.Button("Save RP Settings ", variant="primary")
+                                rp_restore_btn = gr.Button("Restore RP Defaults ", variant="stop")
 
-                    # ── RIGHT COLUMN — Visualizer ─────────────────────────
                     with gr.Column(scale=1):
                         right_mode = gr.Radio(
                             choices=["No Generation", "Z-Image-Turbo"],
                             value="Z-Image-Turbo",
-                            label="Visualizer",
+                            label="Visualizer ",
                             interactive=True,
                         )
-
-                        # The image display is always visible; only generation
-                        # behaviour changes with the Visualizer mode.
                         default_img = (
-                            "./data/new_session.jpg"
+                            "./data/new_session.jpg "
                             if os.path.exists("./data/new_session.jpg")
                             else None
                         )
                         generated_image = gr.Image(
-                            label="Generated Image",
+                            label="Generated Image ",
                             type="filepath",
                             interactive=False,
                             height=420,
                             value=default_img,
                             elem_id="generated_image",
                         )
-                        # Single-row thumbnail strip — newest image first.
-                        # Height accommodates ~100px thumbnails + label/padding.
-                        # object_fit="contain" scales each thumbnail to fit
-                        # within its cell without cropping.
                         sequence_gallery = gr.Gallery(
-                            label="Sequence",
+                            label="Sequence ",
                             columns=8,
                             rows=1,
                             height=188,
@@ -1019,59 +994,48 @@ def launch_gradio_interface() -> str | None:
                             elem_id="sequence_gallery",
                         )
 
-                # ── Status bar + Restart + Exit ──────────────────────────
                 with gr.Row():
                     conv_status = gr.Textbox(
-                        value="Ready.",
-                        label="Status",
+                        value="Ready. ",
+                        label="Status ",
                         interactive=False,
                         max_lines=1,
                         scale=20,
                     )
                     with gr.Column(scale=3, min_width=240):
-                        restart_btn = gr.Button(
-                            "Restart Session",
-                            variant="primary",
-                        )
-                        exit_conv = gr.Button(
-                            "Exit Program",
-                            variant="stop",
-                        )
+                        restart_btn = gr.Button("Restart Session ", variant="primary")
+                        exit_conv = gr.Button("Exit Program ", variant="stop")
 
-                # ── Left panel switching (3 panels) ──────────────────────
+                # FIX: Panel switching now includes is_processing_state and returns component visibility
                 left_mode.change(
                     fn=switch_left_panel,
-                    inputs=left_mode,
-                    outputs=[interaction_panel, happenings_panel, personalize_panel],
+                    inputs=[left_mode, is_processing_state],
+                    outputs=[
+                        interaction_panel,
+                        happenings_panel,
+                        personalize_panel,
+                        user_input,
+                        workflow_progress,
+                        send_btn,
+                        cancel_btn,
+                    ],
                 )
 
-                # ── Right Visualizer mode → update state ─────────────────
                 right_mode.change(
                     fn=switch_right_panel_and_state,
                     inputs=right_mode,
                     outputs=right_panel_state,
                 )
 
-                # ── Gallery thumbnail click → show in Generated Image ────
                 sequence_gallery.select(
                     fn=on_gallery_select,
                     inputs=None,
                     outputs=generated_image,
                 )
 
-                # ── Send message ─────────────────────────────────────────
-                # Outputs include user_input (to clear it),
-                # sequence_gallery (to update the image list), and
-                # send_btn / cancel_btn (to toggle visibility).
-                #
-                # The .then() callback fires after the generator stream ends
-                # and explicitly restores the Send / Cancel button state.
-                # This is necessary because Gradio streaming generators do not
-                # reliably apply UI updates from the final yield; the .then()
-                # ensures Cancel is always hidden once the pipeline is done.
                 send_btn.click(
-                     fn=chat_with_model,
-                    inputs=[user_input, right_panel_state],
+                    fn=chat_with_model,
+                    inputs=[user_input, right_panel_state, is_processing_state],
                     outputs=[
                         bot_response,
                         instance_display,
@@ -1082,17 +1046,17 @@ def launch_gradio_interface() -> str | None:
                         sequence_gallery,
                         send_btn,
                         cancel_btn,
+                        workflow_progress,
+                        is_processing_state,
                     ],
                 )
 
-                # ── Cancel response ───────────────────────────────────────
                 cancel_btn.click(
                     fn=cancel_response,
                     inputs=[],
-                    outputs=[conv_status, send_btn, cancel_btn],
+                    outputs=[conv_status, send_btn, cancel_btn, is_processing_state],
                 )
 
-                # ── Restart Session (status bar button) ──────────────────
                 _reset_outputs = [
                     instance_display,
                     session_display,
@@ -1101,12 +1065,15 @@ def launch_gradio_interface() -> str | None:
                     conv_status,
                     user_input,
                     sequence_gallery,
+                    send_btn,
+                    cancel_btn,
+                    workflow_progress,
+                    is_processing_state,
                 ]
                 restart_btn.click(
                     fn=reset_session, inputs=[], outputs=_reset_outputs
                 )
 
-                # ── Save RP settings ─────────────────────────────────────
                 rp_save_btn.click(
                     fn=save_roleplay_settings,
                     inputs=[
@@ -1120,197 +1087,145 @@ def launch_gradio_interface() -> str | None:
                     outputs=conv_status,
                 )
 
-                # ── Restore RP settings ──────────────────────────────────
                 rp_restore_btn.click(
                     fn=restore_roleplay_settings,
                     inputs=[],
                     outputs=[
-                        rp_agent1_name,   rp_agent1_role,
-                        rp_agent2_name,   rp_agent2_role,
-                        rp_agent3_name,   rp_agent3_role,
-                        rp_human_name,    rp_human_age,     rp_human_gender,
+                        rp_agent1_name, rp_agent1_role,
+                        rp_agent2_name, rp_agent2_role,
+                        rp_agent3_name, rp_agent3_role,
+                        rp_human_name, rp_human_age, rp_human_gender,
                         rp_scene_location, rp_event_time,
                         rp_default_history,
                         conv_status,
                     ],
                 )
 
-                # ── Exit ─────────────────────────────────────────────────
                 exit_conv.click(fn=shutdown, inputs=[], outputs=[])
 
-            # ==============================================================
-            # TAB 2 — Configuration
-            # ==============================================================
             with gr.Tab("Configuration"):
-
-                # ── HARDWARE & BACKEND ───────────────────────────────────
                 with gr.Group():
-                    gr.Markdown("### Hardware & Backend")
+                    gr.Markdown("### Hardware & Backend ")
                     with gr.Row():
                         selected_gpu_dropdown = gr.Dropdown(
                             choices=gpu_names,
                             value=gpu_names[valid_gpu_index],
-                            label="Selected GPU",
-                            info="Select which GPU to use for inference. User sets VRAM allocation.",
+                            label="Selected GPU ",
+                            info="Select which GPU to use for inference. User sets VRAM allocation. ",
                             interactive=(len(gpu_names) > 1),
                         )
                         vram_options_str = [str(v) for v in cfg.VRAM_OPTIONS]
-                        valid_vram = (
-                            cfg.vram_assigned
-                            if cfg.vram_assigned in cfg.VRAM_OPTIONS
-                            else 8192
-                        )
+                        valid_vram = cfg.vram_assigned if cfg.vram_assigned in cfg.VRAM_OPTIONS else 8192
                         selected_vram_dropdown = gr.Dropdown(
                             choices=vram_options_str,
                             value=str(valid_vram),
-                            label="VRAM Allocation (MB)",
-                            info="VRAM budget for both text + image models. Layers auto-calculated.",
+                            label="VRAM Allocation (MB) ",
+                            info="VRAM budget for both text + image models. Layers auto-calculated. ",
                             interactive=True,
                         )
                     with gr.Row():
                         selected_cpu_dropdown = gr.Dropdown(
                             choices=cpu_names,
                             value=cpu_names[valid_cpu_index],
-                            label="Selected CPU",
-                            info="Select the CPU to use for inference. If only one is available, this is fixed.",
+                            label="Selected CPU ",
+                            info="Select the CPU to use for inference. If only one is available, this is fixed. ",
                             interactive=(len(cpu_names) > 1),
                         )
                         threads_assigned_slider = gr.Slider(
-                            minimum=1,
-                            maximum=max_threads,
-                            step=1,
-                            value=valid_threads,
-                            label="Threads Assigned",
-                            info=f"Number of threads for inference. System has {cfg.CPU_THREADS} total threads.",
+                            minimum=1, maximum=max_threads, step=1, value=valid_threads,
+                            label="Threads Assigned ",
+                            info=f"Number of threads for inference. System has {cfg.CPU_THREADS} total threads. ",
                         )
                     with gr.Row():
                         auto_unload_check = gr.Checkbox(
-                            label="Auto-unload model on high SYSTEM RAM",
+                            label="Auto-unload model on high SYSTEM RAM ",
                             value=cfg.auto_unload,
                         )
                         max_memory_slider = gr.Slider(
-                            minimum=50,
-                            maximum=95,
-                            step=5,
-                            value=cfg.max_memory_percent,
-                            label="Max System RAM % (unload threshold)",
-                            info="Triggers model unload when system RAM exceeds this percentage (NOT VRAM)",
+                            minimum=50, maximum=95, step=5, value=cfg.max_memory_percent,
+                            label="Max System RAM % (unload threshold) ",
+                            info="Triggers model unload when system RAM exceeds this percentage (NOT VRAM) ",
                         )
 
-                # ── MODEL FOLDERS ────────────────────────────────────────
-                gr.Markdown("### Model Folders") # Text model also is image encoder. ae.safetensors auto-copied to image folder when set.
+                gr.Markdown("### Model Folders ")
                 with gr.Row():
-                    text_folder_in = gr.Textbox(
-                        label="Text Model Folder",
-                        value=cfg.text_model_folder,
-                        scale=4,
-                    )
-                    text_browse_btn = gr.Button("Browse...", scale=1)
-                    image_folder_in = gr.Textbox(
-                        label="Image Model Folder",
-                        value=cfg.image_model_folder,
-                        scale=4,
-                    )
-                    image_browse_btn = gr.Button("Browse...", scale=1)
+                    text_folder_in = gr.Textbox(label="Text Model Folder ", value=cfg.text_model_folder, scale=4)
+                    text_browse_btn = gr.Button("Browse... ", scale=1)
+                    image_folder_in = gr.Textbox(label="Image Model Folder ", value=cfg.image_model_folder, scale=4)
+                    image_browse_btn = gr.Button("Browse... ", scale=1)
 
-                text_browse_btn.click(
-                    fn=browse_text_folder,
-                    inputs=text_folder_in,
-                    outputs=text_folder_in,
-                )
-                image_browse_btn.click(
-                    fn=browse_image_folder,
-                    inputs=image_folder_in,
-                    outputs=image_folder_in,
-                )
+                text_browse_btn.click(fn=browse_text_folder, inputs=text_folder_in, outputs=text_folder_in)
+                image_browse_btn.click(fn=browse_image_folder, inputs=image_folder_in, outputs=image_folder_in)
 
-                # ── IMAGE GENERATION ─────────────────────────────────────
                 with gr.Group():
-                    gr.Markdown("### Image Generation (Z-Image-Turbo)")
+                    gr.Markdown("### Image Generation (Z-Image-Turbo) ")
                     with gr.Row():
                         image_size_dd = gr.Dropdown(
-                            label="Image Size",
+                            label="Image Size ",
                             choices=cfg.IMAGE_SIZE_OPTIONS["available_sizes"],
                             value=cfg.IMAGE_SIZE_OPTIONS["selected_size"],
                             type="value",
                         )
                         steps_dd = gr.Dropdown(
-                            label="Image Steps",
+                            label="Image Steps ",
                             choices=[str(s) for s in cfg.STEPS_OPTIONS],
                             value=str(cfg.selected_steps),
                             type="value",
-                            info="Z-Image-Turbo is optimised for 8 steps.",
+                            info="Z-Image-Turbo is optimised for 8 steps. ",
                         )
                         sample_dd = gr.Dropdown(
-                            label="Sample Method",
+                            label="Sample Method ",
                             choices=cfg.SAMPLE_METHOD_OPTIONS,
                             value=cfg.selected_sample_method,
                             type="value",
                         )
                         cfg_scale_dd = gr.Dropdown(
-                            label="CFG Scale",
+                            label="CFG Scale ",
                             choices=[str(c) for c in cfg.CFG_SCALE_OPTIONS],
                             value=str(cfg.selected_cfg_scale),
                             type="value",
-                            info="Use 1.0 for Z-Image-Turbo (distilled). Higher = stronger prompt adherence.",
+                            info="Use 1.0 for Z-Image-Turbo (distilled). Higher = stronger prompt adherence. ",
                         )
                     negative_prompt_in = gr.Textbox(
-                        label="Negative Prompt (Z-Image-Turbo mostly ignores this)",
+                        label="Negative Prompt (Z-Image-Turbo mostly ignores this) ",
                         value=cfg.default_negative_prompt,
                         lines=1,
-                        placeholder="Leave empty for best results with Z-Image-Turbo",
+                        placeholder="Leave empty for best results with Z-Image-Turbo ",
                     )
 
-                # ── Status bar + Save + Exit ─────────────────────────────
                 with gr.Row():
                     cfg_status = gr.Textbox(
-                        value="Configuration tab loaded.",
-                        label="Status",
+                        value="Configuration tab loaded. ",
+                        label="Status ",
                         interactive=False,
                         max_lines=1,
                         scale=20,
                     )
                     with gr.Column(scale=3, min_width=240):
-                        save_btn = gr.Button(
-                            "Save Configuration", variant="primary"
-                        )
-                        exit_cfg = gr.Button(
-                            "Exit Program",
-                            variant="stop",
-                        )
+                        save_btn = gr.Button("Save Configuration ", variant="primary")
+                        exit_cfg = gr.Button("Exit Program ", variant="stop")
 
                 save_btn.click(
                     fn=save_config_tab_settings,
                     inputs=[
-                        selected_gpu_dropdown,
-                        selected_vram_dropdown,
-                        selected_cpu_dropdown,
-                        threads_assigned_slider,
-                        auto_unload_check,
-                        max_memory_slider,
-                        image_size_dd,
-                        steps_dd,
-                        sample_dd,
-                        cfg_scale_dd,
-                        negative_prompt_in,
-                        text_folder_in,
-                        image_folder_in,
+                        selected_gpu_dropdown, selected_vram_dropdown,
+                        selected_cpu_dropdown, threads_assigned_slider,
+                        auto_unload_check, max_memory_slider,
+                        image_size_dd, steps_dd, sample_dd, cfg_scale_dd,
+                        negative_prompt_in, text_folder_in, image_folder_in,
                     ],
                     outputs=cfg_status,
                 )
 
                 exit_cfg.click(fn=shutdown, inputs=[], outputs=[])
 
-    # ------------------------------------------------------------------
-    # Start the Gradio server (non-blocking, no browser)
-    # ------------------------------------------------------------------
-    # queue() is required for generator functions (like chat_with_model)
-    # to stream partial results back to the UI progressively.
     interface.queue()
     _app, local_url, _share_url = interface.launch(
         inbrowser=False,
         prevent_thread_lock=True,
         server_name="127.0.0.1",
+        js=_SPELLCHECK_JS,
+        css=_CUSTOM_CSS,
     )
     print(f"Gradio server started at {local_url}")
     return local_url
