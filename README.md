@@ -191,7 +191,7 @@ Here is some info about the modesls...
 ### Install and Use
 - Instructions for installation...
 ```
-1. Download the latest release version, and unpack it to a sensible folder. I put it in `C:\Inference_Files\Rpg-Gradio-Gguf`.
+1. Download the latest release version, and unpack it to a sensible folder. I put it in `C:\Inference_Files\Rpg-Gradio-Gguf`. Where in "C:\Inference_Files" where, I would put LLM programs and no space in resulting full-path.
 2. Right click the batch and "Run as admin...", then select Install (option 3) from the menu.
 3. Check the install, determine, if you need to install extra things and if there were errors. If you do have errors, check the internet connections and/or feed the output into AI to ask how to make it work.
 4. At the end of the installer press enter to return to the batch menu.
