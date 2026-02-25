@@ -25,7 +25,7 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 ![preview_image](media/configuration_page.jpg)
 
 <details>
-<summary>The installation processes, installing libraries and packages locally in program folder..(v2.04)</summary>
+<summary>The installation processes, installing in program folder..(v2.04)</summary>
 
     ```
     ===============================================================================
@@ -175,7 +175,7 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 </details>
 
 <details>
-<summary>- The Batch Menu, how I do them for GUI apps..(v2.05)</summary>
+<summary>The Batch Menu, how I do them for GUI apps..(v2.05)</summary>
     
     ===============================================================================
         Rpg-Gradio-Gguf - Main Menu
