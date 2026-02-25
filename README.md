@@ -175,7 +175,7 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 </details>
 
 <details>
-<summary>- The Batch Menu...</summary>
+<summary>- The Batch Menu, how I do them for GUI apps..</summary>
     
     ===============================================================================
         Rpg-Gradio-Gguf - Main Menu
