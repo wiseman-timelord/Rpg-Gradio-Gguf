@@ -218,8 +218,7 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 ### Models
 Here is some info about the modesls...
 - Text model: [Qwen3-4b-Z-Image-Turbo-AbliteratedV1](https://huggingface.co/mradermacher/Qwen3-4b-Z-Image-Turbo-AbliteratedV1-GGUF). This gives you your uncensored RPG brain, and creates quality prompt for image generation.
-- Image model: [Z-Image-Turbo-GGUF](https://huggingface.co/vantagewithai/Z-Image-Turbo-GGUF). This enables image generation.
-- SafeTensors - [Link1 ae.safetensors](https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors?download=true) or [Link2 ae.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors?download=true)], this is downloaded by the installer, and automatically copied to same folder as Image model if the the Image model is not in `.\models`. Needs this for Z-Image to work, even though Image model is GGUF. 
+- Image model: [Z-Image-Turbo-GGUF](https://huggingface.co/vantagewithai/Z-Image-Turbo-GGUF). This enables image generation. 
 
 ### Install and Use
 - Instructions for installation...
@@ -228,6 +227,7 @@ Here is some info about the modesls...
 2. Right click the batch and "Run as admin...", then select Install (option 3) from the menu.
 3. Check the install, determine, if you need to install extra things and if there were errors. If you do have errors, check the internet connections and/or feed the output into AI to ask how to make it work.
 4. At the end of the installer press enter to return to the batch menu.
+- The installer downloads a ~350MB "ae.safetensors" file, this is, automatically copied to image model folder and required for image generation. Do not delete it from ".\models".  
 ```
 - Instructions for usage...
 ```
@@ -242,10 +242,18 @@ Here is some info about the modesls...
 ```
 
 ### Notation
-- Test input 1 for 1 Agent: `Hello, you look wise for a llama, are you a wise llama, that knows wise things?`
-- Test input 2 for 1 Agent: `I seek wisdom, what is the most, wisest and knowledgeable, thing you know of? `
-- Test input 1 for 2 Agents: `Oh, a llama with the accompaniment of a bluebird, you two look like a wise and jovial enough group, I think I will relax here for a moment with you.`
-- Test input 2 for 2 Agents: `Well it is early, but do you two have any plans yet, it looks like its going to be a fine day.`
+- T.B.A.
+
+### Test Examples
+```
+For 1 Agent...
+Test input 1 for 1 Agent: `Hello, you look wise for a llama, are you a wise llama, that knows wise things?`
+Test input 2 for 1 Agent: `I seek wisdom, what is the most, wisest and knowledgeable, thing you know of? `
+
+For 2 Agents...
+Test input 1 for 2 Agents: `Oh, a llama with the accompaniment of a bluebird, you two look like a wise and jovial enough group, I think I will relax here for a moment with you.`
+Test input 2 for 2 Agents: `Well it is early, but do you two have any plans yet, it looks like its going to be a fine day.`
+```
 
 ### File Structure
 - Initial File Structure...
