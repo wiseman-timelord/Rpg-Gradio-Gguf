@@ -184,7 +184,7 @@ def unload_image_model() -> None:
     print("Image model unloaded.")
 
 
-def ensure_models_loaded() -> tuple[bool, str]:
+def ensure_models_loaded(need_image: bool = False) -> tuple[bool, str]:
     """
     Lazy-load text and image models if they are not already in memory.
 
@@ -192,30 +192,48 @@ def ensure_models_loaded() -> tuple[bool, str]:
     so the user does not have to restart the application after changing
     model folders or after an idle-timeout unload.
 
+    Parameters
+    ----------
+    need_image : bool
+        When True (i.e. Visualizer is set to "Z-Image-Turbo"), the image
+        model is a hard requirement and a load failure will return ok=False.
+        When False ("No Generation" mode), the image model is optional and
+        a load failure is silently skipped.
+
     Returns
     -------
     (ok: bool, message: str)
-        ok      — True if the text model is available (minimum requirement).
+        ok      — True if all required models are available.
         message — Human-readable status suitable for the UI status bar.
     """
     messages: list[str] = []
 
+    # Text model is always required.
     if not cfg.text_model_loaded:
         print("Lazy-loading text model...")
         messages.append("Loading text model…")
         if load_text_model():
             messages.append("Text model loaded.")
         else:
-            messages.append("Text model failed to load — check the Model Folder path in Configuration.")
+            messages.append(
+                "Text model failed to load — check the Model Folder path in Configuration."
+            )
             return False, " ".join(messages)
 
+    # Image model: required when Visualizer is "Z-Image-Turbo", optional otherwise.
     if not cfg.image_model_loaded:
         print("Lazy-loading image model...")
         messages.append("Loading image model…")
         if load_image_model():
             messages.append("Image model loaded.")
+        elif need_image:
+            # Hard failure — image generation was requested but model is unavailable.
+            messages.append(
+                "Image model failed to load — check the Image Model Folder in Configuration."
+            )
+            return False, " ".join(messages)
         else:
-            # Image model is optional — warn but don't block chat
+            # Soft failure — "No Generation" mode, image model not needed right now.
             messages.append("Image model unavailable (images will be skipped).")
 
     return True, " ".join(messages) if messages else "Models ready."
@@ -451,16 +469,38 @@ def run_text_inference(
 
 SYSTEM_PROMPTS: dict[str, str] = {
     "converse": (
-        "You are a creative roleplay partner. Stay in character at all "
-        "times. Respond with exactly one line of dialogue followed by one "
-        "sentence describing a physical action. Never break character, add "
-        "meta-commentary, or narrate the other character's actions."
+        "You are a creative roleplay writer. Your task is to write the next "
+        "response for a specific named character in an ongoing scene. "
+        "Stay completely in character. "
+        "Write exactly one sentence of spoken dialogue followed by exactly one "
+        "sentence describing a physical action performed by that character. "
+        "Do not write dialogue or actions for any other character. "
+        "Do not add commentary, scene headers, or break the fourth wall."
     ),
     "consolidate": (
-        "You are a concise narrative summariser. Condense roleplay "
-        "conversations into tight third-person prose. Preserve every "
-        "important event, character action, and setting detail. Never "
-        "add events that did not occur."
+        "You are a narrative chronicler maintaining a running third-person "
+        "prose record of an ongoing roleplay scene. "
+        "Write only in descriptive, observational prose — "
+        "absolutely no spoken dialogue, quoted speech, or character lines. "
+        "When characters speak, summarise the topic and emotional tone of "
+        "the exchange (e.g. 'they discussed the nature of the mist') rather "
+        "than reproducing any words. "
+        "Capture character actions, scene atmosphere, mood, and any "
+        "meaningful shifts in topic or situation. "
+        "Never add events that did not occur."
+    ),
+    "instance": (
+        "You are a visual scene recorder. Given a single roleplay exchange, "
+        "write a compact third-person descriptive paragraph (50-80 words) "
+        "capturing the physical scene of that specific moment: character "
+        "positions, expressions, body language, actions, and atmosphere. "
+        "Write only what can be seen — no dialogue, no quoted speech, "
+        "no inner thoughts. "
+        "Every character listed under 'Characters present', including the "
+        "human participant, is physically in the scene and MUST be described. "
+        "Describe each character once using their appearance or role label. "
+        "This paragraph will feed directly into an image generation model, "
+        "so make it visually precise and concrete."
     ),
     "image_prompt": (
         'You are Z-Engineer, an expert prompt engineering AI specialising '
@@ -509,50 +549,98 @@ PROMPT_TEMPLATES: dict[str, str] = {
     # {scene_context}            — location + optional time
     # {responding_agent_name}    — Agent 1 (the speaker for this turn)
     # {responding_agent_role}    — Agent 1's role
-    # {human_description}        — human name + optional age/gender
+    # {human_description}        — human name + optional decade/gender
     # {session_history}          — consolidated narrative so far
     # {human_input}              — what the human just said
     "converse": (
-        "The following characters are present in this scene: {characters_context}.\n"
-        "The setting is: {scene_context}.\n"
+        "Scene characters (only these characters exist — do not invent others): "
+        "{characters_context}.\n"
+        "Setting: {scene_context}.\n"
         "\n"
-        "You are {responding_agent_name}, embodying the role of '{responding_agent_role}'.\n"
+        "You are writing for {responding_agent_name}, whose role is "
+        "'{responding_agent_role}'.\n"
         "\n"
-        "The events so far are: '{session_history}'.\n"
+        "Story so far: {session_history}\n"
         "\n"
-        "Just now, {human_description} said to you: '{human_input}'.\n"
+        "{human_description} just said: \"{human_input}\"\n"
         "\n"
-        "Your task: respond as {responding_agent_name} with exactly one sentence "
-        "of dialogue followed by one sentence describing a physical action you take. "
-        "Example format: '\"I am pleased you found me here\", "
-        "{responding_agent_name} says, offering a slight bow to {human_description}.'\n"
+        "Write {responding_agent_name}'s response now. "
+        "One sentence of dialogue, then one sentence of physical action. "
+        "Example: '\"How wonderful that you found us here,\" "
+        "{responding_agent_name} says, tilting their head toward "
+        "{human_description}.'\n"
         "\n"
-        "Output only {responding_agent_name}'s response — no scene headers, "
-        "no meta-commentary, no narration of other characters."
+        "Output only {responding_agent_name}'s single response — "
+        "no other characters, no scene headers, no meta-commentary."
     ),
 
     # ── Consolidate ───────────────────────────────────────────────────────
+    # {agent_exchange} holds the full agent response block assembled by
+    # displays.py — one or more lines of "AgentName: response" depending
+    # on how many agents are active.  This replaces the old single-agent
+    # {responding_agent_name}: {agent_output} pattern.
     "consolidate": (
-        "Below is a roleplay conversation. Summarise it into a concise "
-        "third-person narrative paragraph that preserves all important events, "
-        "character actions, and scene details. Keep the summary under 200 words. "
-        "Do not add new events.\n"
+        "Update the narrative chronicle below by incorporating the new exchange.\n"
         "\n"
         "Characters: {characters_context}\n"
         "Setting: {scene_context}\n"
         "\n"
-        "Conversation:\n"
+        "CURRENT CHRONICLE:\n"
         "{session_history}\n"
         "\n"
+        "NEW EXCHANGE:\n"
         "{human_description}: {human_input}\n"
-        "{responding_agent_name}: {agent_output}\n"
+        "{agent_exchange}\n"
         "\n"
-        "Summary:"
+        "Write an updated third-person narrative chronicle (under 200 words) "
+        "that covers all prior events and the new exchange above.\n"
+        "\n"
+        "STRICT RULES — follow every one:\n"
+        "• NO dialogue, quotes, or speech reproduction of any kind.\n"
+        "• Summarise what characters discussed by topic and tone only "
+        "(e.g. 'they spoke of ancient paths' — never quote what was said).\n"
+        "• Describe physical actions, expressions, and scene atmosphere.\n"
+        "• Note any significant shift in topic, mood, or location.\n"
+        "• Write in flowing prose sentences — no bullet points or lists.\n"
+        "\n"
+        "Updated narrative chronicle:"
+    ),
+
+    # ── Instance ──────────────────────────────────────────────────────────
+    # Summarises only the most recent rotation (human_input + agent_exchange)
+    # into a compact visual scene description.  Stored as
+    # cfg.consolidated_instance and used as the source for image_prompt.
+    #
+    # Uses {characters_visual} (agents by role + human with visual anchor)
+    # rather than {characters_context} (agents only) so the human participant
+    # is explicitly listed as a character the model must describe.
+    "instance": (
+        "Describe the physical scene of this single roleplay moment "
+        "as a compact third-person paragraph (50-80 words).\n"
+        "\n"
+        "Characters present (ALL must appear in your description):\n"
+        "{characters_visual}\n"
+        "Setting: {scene_context}\n"
+        "\n"
+        "EXCHANGE:\n"
+        "{human_description}: {human_input}\n"
+        "{agent_exchange}\n"
+        "\n"
+        "STRICT RULES:\n"
+        "• Every character listed above is physically in the scene — "
+        "describe each one visually, including {human_description}.\n"
+        "• No dialogue or quoted speech — describe only what can be seen.\n"
+        "• Mention each character ONCE using their appearance or role.\n"
+        "• Describe body language, expressions, positions, and atmosphere.\n"
+        "• Flowing prose only — no bullet points.\n"
+        "\n"
+        "Visual scene description:"
     ),
 
     # ── Image prompt ──────────────────────────────────────────────────────
-    # The system prompt (SYSTEM_PROMPTS["image_prompt"]) carries all the
-    # Z-Image-specific rules; this user message provides scene context.
+    # Uses consolidated_instance (single-rotation visual summary) rather than
+    # the full session_history.  characters_visual lists each character once
+    # by appearance/role (no repeated names) to prevent phantom duplicates.
     "image_prompt": (
         "Rewrite the following scene description as a single vivid visual "
         "prompt paragraph (120-180 words) optimised for Z-Image Turbo. "
@@ -561,11 +649,12 @@ PROMPT_TEMPLATES: dict[str, str] = {
         "natural sentences — no tag lists. Apply all Positive Constraint "
         "rules.\n"
         "\n"
-        "Characters present: {characters_context}\n"
+        "Characters present (each described once by appearance): "
+        "{characters_visual}\n"
         "Setting: {scene_context}\n"
         "\n"
-        "Scene narrative:\n"
-        "{session_history}\n"
+        "Scene moment:\n"
+        "{consolidated_instance}\n"
         "\n"
         "Enhanced prompt:"
     ),
@@ -601,8 +690,16 @@ def parse_agent_response(raw: str) -> str:
 
 
 def _is_blank(val: str) -> bool:
-    """Return True if a value should be treated as unset/inactive."""
-    return not val or val.strip().lower() in ("none", "")
+    """Return True if a value should be treated as unset/inactive.
+
+    Treats the following as blank (no detail to include in prompts):
+      - None / empty string
+      - "none"  (the literal string)
+      - "0" or "-1"  (numeric sentinel values users might type)
+    """
+    if not val:
+        return True
+    return val.strip().lower() in ("", "none", "0", "-1")
 
 
 def _build_characters_context() -> str:
@@ -638,26 +735,129 @@ def _build_characters_context() -> str:
     return ", ".join(entries[:-1]) + f" and {entries[-1]}"
 
 
+def _build_characters_visual() -> str:
+    """
+    Build a visual/role-based description of all active characters for use
+    in the image_prompt template.
+
+    Each character is described by their role alone (e.g. "a wise oracle
+    llama", "a jovial song bird") so that the image model receives a concise
+    appearance cue rather than a repeated name.  The human player is included
+    last using their _build_human_description() phrase.
+
+    This avoids repeating character names multiple times in image prompts,
+    which was causing phantom duplicate characters in generated images.
+
+    Example output:
+        "a wise oracle llama, a jovial song bird, and a benevolent adventurer
+        in their 30s"
+    """
+    entries: list[str] = []
+    agent_slots = [
+        (cfg.agent1_name, cfg.agent1_role),
+        (cfg.agent2_name, cfg.agent2_role),
+        (cfg.agent3_name, cfg.agent3_role),
+    ]
+    for name, role in agent_slots:
+        name = (name or "").strip()
+        role = (role or "").strip()
+        if _is_blank(name):
+            continue
+        # Use the role description if available, otherwise fall back to the name
+        if not _is_blank(role):
+            # Lowercase and prefix with "a" / "an" only if it doesn't already
+            # start with an article — keeps language natural.
+            role_lower = role.lower()
+            if role_lower[:2] in ("a ", "an"):
+                entries.append(role_lower)
+            else:
+                # Pick "an" for vowel-initial words, "a" otherwise
+                article = "an" if role_lower[0] in "aeiou" else "a"
+                entries.append(f"{article} {role_lower}")
+        else:
+            entries.append(name)
+
+    # Add the human player with a visual anchor phrase.
+    # _build_human_description() returns one of:
+    #   "Name in his/her/their Ns"  (age set)
+    #   "Name, male/female"         (gender set, no age)
+    #   "Name"                      (only name — the default case)
+    #
+    # For the bare-name case we wrap it as "a traveller named Name" so the
+    # image model has a recognisable subject type, not just an abstract label.
+    human_name = (cfg.human_name or "Human").strip()
+    human_desc = _build_human_description()
+    human_desc_lower = human_desc.lower()
+
+    # If _build_human_description returned only the name (no age/gender detail),
+    # augment it into "a traveller named <Name>" for a concrete visual anchor.
+    if human_desc_lower == human_name.lower():
+        entries.append(f"a traveller named {human_name}")
+    else:
+        # Age/gender were present — use the richer description as-is
+        entries.append(human_desc_lower)
+
+    if not entries:
+        return "figures in the scene"
+    if len(entries) == 1:
+        return entries[0]
+    return ", ".join(entries[:-1]) + f", and {entries[-1]}"
+
+
+def _age_to_decade_phrase(age_str: str, gender: str) -> str:
+    """Convert a numeric age string to a natural decade phrase.
+
+    Gender-aware pronoun selection:
+      Male   → "in his 40s"
+      Female → "in her 40s"
+      Other  → "in their 40s"
+
+    Returns an empty string for invalid / non-positive ages.
+    """
+    try:
+        age_int = int(age_str.strip())
+        if age_int <= 0:
+            return ""
+        decade = (age_int // 10) * 10
+        gender_lower = (gender or "").strip().lower()
+        if gender_lower == "male":
+            pronoun = "his"
+        elif gender_lower == "female":
+            pronoun = "her"
+        else:
+            pronoun = "their"
+        return f"in {pronoun} {decade}s"
+    except (ValueError, AttributeError):
+        return ""
+
+
 def _build_human_description() -> str:
     """
-    Build a concise human/player description including optional age and gender.
+    Build a concise, natural-language human/player description.
 
-    Blank or 'None' values for age/gender are omitted to keep prompts clean.
+    Logic:
+    - If age is set (positive integer): use decade phrase which encodes
+      gender implicitly via pronoun — e.g. "Benevolent-Adventurer in his 40s"
+    - If age is blank but gender is set: append gender label only —
+      e.g. "Benevolent-Adventurer, male"
+    - If both are blank/None/0: return name only —
+      e.g. "Benevolent-Adventurer"
 
-    Example: "Benevolent-Adventurer (Male, age 28)" or just "Benevolent-Adventurer"
+    Blank checks include: empty string, "none", "0", "-1".
     """
     name   = (cfg.human_name   or "Human").strip()
     age    = (cfg.human_age    or "").strip()
     gender = (cfg.human_gender or "").strip()
 
-    extras: list[str] = []
-    if not _is_blank(gender):
-        extras.append(gender)
-    if not _is_blank(age):
-        extras.append(f"age {age}")
+    age_phrase = _age_to_decade_phrase(age, gender)
 
-    if extras:
-        return f"{name} ({', '.join(extras)})"
+    if age_phrase:
+        # e.g. "Benevolent-Adventurer in his 40s"
+        # The pronoun already conveys gender, no need to repeat it.
+        return f"{name} {age_phrase}"
+    if not _is_blank(gender):
+        # e.g. "Benevolent-Adventurer, male"
+        return f"{name}, {gender.lower()}"
     return name
 
 
@@ -685,25 +885,77 @@ def _get_responding_agent() -> tuple[str, str]:
     return name, role
 
 
-def _build_runtime_data() -> dict:
+def get_active_agents() -> list[tuple[str, str]]:
+    """
+    Return a list of ``(name, role)`` tuples for every configured agent
+    whose name is non-blank and not a sentinel value ("none", "0", "-1").
+
+    Agents are returned in slot order (1 → 2 → 3).
+    If no agents are configured, a single fallback entry is returned so
+    that callers always get at least one agent to prompt.
+
+    This is the public API used by displays.py to drive the per-agent
+    converse loop.
+    """
+    slots = [
+        (cfg.agent1_name, cfg.agent1_role),
+        (cfg.agent2_name, cfg.agent2_role),
+        (cfg.agent3_name, cfg.agent3_role),
+    ]
+    active: list[tuple[str, str]] = []
+    for name, role in slots:
+        name = (name or "").strip()
+        role = (role or "").strip()
+        if not _is_blank(name):
+            active.append((name, role))
+
+    return active if active else [("Agent", "")]
+
+
+def _build_runtime_data(responding_agent: tuple[str, str] | None = None) -> dict:
     """
     Assemble the placeholder dict used by all prompt templates.
 
     Dynamic context strings are computed here so templates stay readable and
     any blank / 'None' fields are silently omitted from the resulting prompt.
+
+    Parameters
+    ----------
+    responding_agent : (name, role) tuple, optional
+        When supplied, overrides the default Agent 1 as the responding
+        character.  Used by the per-agent converse loop so each active
+        agent gets its own focused inference call.
     """
-    characters_ctx = _build_characters_context()
-    human_desc     = _build_human_description()
-    scene_ctx      = _build_scene_context()
-    r_name, r_role = _get_responding_agent()
+    characters_ctx    = _build_characters_context()
+    characters_visual = _build_characters_visual()
+    human_desc        = _build_human_description()
+    scene_ctx         = _build_scene_context()
+
+    if responding_agent is not None:
+        r_name, r_role = responding_agent
+        r_name = (r_name or "Agent").strip()
+        r_role = (r_role or "").strip()
+    else:
+        r_name, r_role = _get_responding_agent()
+
+    # agent_exchange is used by the consolidate template to represent the
+    # full multi-agent response block.  It is set externally on cfg before
+    # consolidation is triggered; we read it here with a safe fallback.
+    agent_exchange = getattr(cfg, "agent_exchange", None) or (
+        f"{r_name}: {cfg.agent_output}" if cfg.agent_output else ""
+    )
 
     return {
         # Computed context strings
         "characters_context":    characters_ctx,
+        "characters_visual":     characters_visual,
         "human_description":     human_desc,
         "scene_context":         scene_ctx,
         "responding_agent_name": r_name,
         "responding_agent_role": r_role,
+
+        # Multi-agent exchange block (for consolidate / instance templates)
+        "agent_exchange":        agent_exchange,
 
         # Legacy / convenience aliases
         "agent_name":     r_name,
@@ -712,22 +964,30 @@ def _build_runtime_data() -> dict:
         "scene_location": cfg.scene_location or "Unknown Location",
 
         # Per-turn values
-        "session_history": cfg.session_history or "No prior conversation.",
-        "human_input":     cfg.human_input     or "",
-        "agent_output":    cfg.agent_output     or "",
+        "session_history":       cfg.session_history       or "No prior conversation.",
+        "consolidated_instance": cfg.consolidated_instance or "",
+        "human_input":           cfg.human_input           or "",
+        "agent_output":          cfg.agent_output          or "",
     }
 
 
 # -----------------------------------------------------------------------
 # High-level conversation pipeline
 # -----------------------------------------------------------------------
-def prompt_response(task_name: str) -> dict:
+def prompt_response(task_name: str, responding_agent: tuple[str, str] | None = None) -> dict:
     """
     Format the prompt for *task_name*, run inference, and return a dict with
     either {'agent_response': str} or {'error': str}.
 
     If SYSTEM_PROMPTS contains an entry for *task_name*, it is sent as the
     ``system`` role message to Qwen3's chat template.
+
+    Parameters
+    ----------
+    responding_agent : (name, role) tuple, optional
+        When supplied, overrides Agent 1 as the character being prompted.
+        Used by the multi-agent converse loop in displays.py so each active
+        agent receives its own focused inference call.
 
     Returns {'cancelled': True} immediately if cfg.cancel_processing is set.
     """
@@ -739,7 +999,7 @@ def prompt_response(task_name: str) -> dict:
     if not settings:
         return {"error": f"No settings for task '{task_name}'."}
 
-    data = _build_runtime_data()
+    data = _build_runtime_data(responding_agent=responding_agent)
     formatted = format_prompt(task_name, data)
     if formatted is None:
         return {"error": f"Prompt template for '{task_name}' missing or invalid."}
@@ -747,7 +1007,8 @@ def prompt_response(task_name: str) -> dict:
     # Resolve system prompt (may be None → run_text_inference handles it)
     sys_prompt = SYSTEM_PROMPTS.get(task_name)
 
-    print(f"[{task_name}] Sending prompt to model"
+    agent_label = responding_agent[0] if responding_agent else data["responding_agent_name"]
+    print(f"[{task_name}:{agent_label}] Sending prompt to model"
           f"{' (with system prompt)' if sys_prompt else ''}...")
 
     raw = run_text_inference(
@@ -767,7 +1028,7 @@ def prompt_response(task_name: str) -> dict:
     else:
         parsed = parse_agent_response(raw)
 
-    print(f"[{task_name}] Response received ({len(parsed)} chars).")
+    print(f"[{task_name}:{agent_label}] Response received ({len(parsed)} chars).")
     return {"agent_response": parsed}
 
 

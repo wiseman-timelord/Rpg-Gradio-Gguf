@@ -46,12 +46,14 @@ from scripts.utilities import (
     detect_gpus,
     detect_cpus,
     ensure_vae_in_image_folder,
+    scan_for_gguf,
 )
 from scripts.inference import (
     prompt_response,
     generate_image,
     ensure_models_loaded,
     get_image_gen_progress,
+    get_active_agents,
 )
 
 
@@ -85,12 +87,14 @@ def reset_session():
     """Reload config defaults and clear session state."""
     cfg.load_config()
     reset_session_state()
+    cfg.consolidated_instance = ""
     placeholder = "./data/new_session.jpg"
     if not os.path.exists(placeholder):
         placeholder = None
-    # Returns: session_display, bot_response, generated_image, conv_status,
-    #          user_input (clear), sequence_gallery (clear — newest first)
-    return cfg.session_history, "", placeholder, "Session restarted.", "", []
+    # Returns: instance_display (clear), session_display, bot_response,
+    #          generated_image, conv_status, user_input (clear),
+    #          sequence_gallery (clear — newest first)
+    return "", cfg.session_history, "", placeholder, "Session restarted.", "", []
 
 
 def cancel_response():
@@ -111,9 +115,16 @@ def cancel_response():
     )
 
 
-def filter_model_output(raw: str) -> str:
-    """Prefix the responding agent name if the model didn't already include it."""
-    name = cfg.agent1_name or "Agent"
+def filter_model_output(raw: str, agent_name: str | None = None) -> str:
+    """Prefix the responding agent name if the model didn't already include it.
+
+    Parameters
+    ----------
+    agent_name : str, optional
+        The name to prefix.  Falls back to cfg.agent1_name when not supplied
+        (preserves backward compatibility with any external callers).
+    """
+    name = (agent_name or cfg.agent1_name or "Agent").strip()
     if ":" in raw[:40]:
         _, _, after = raw.partition(":")
         return f"{name}: {after.strip()}"
@@ -132,8 +143,8 @@ def chat_with_model(user_input: str, right_mode: str):
     stage so the Gradio UI refreshes progressively instead of blocking
     until the entire pipeline finishes.
 
-    Yields 8 values every iteration:
-        (scenario_log, session_history, image, status,
+    Yields 9 values every iteration:
+        (scenario_log, instance_display, session_history, image, status,
          user_input, sequence_gallery, send_btn_update, cancel_btn_update)
 
     While the pipeline is running the Send button is hidden and the Cancel
@@ -159,13 +170,51 @@ def chat_with_model(user_input: str, right_mode: str):
     # Reset cancel flag for this new turn
     cfg.cancel_processing = False
 
+    # ── Empty input guard — never hide Send or alter the Scenario Log ─────
     if not user_input.strip():
         yield (
-            "Please type a message.",
-            cfg.session_history,
+            cfg.scenario_log or "",          # preserve Scenario Log exactly
+            cfg.consolidated_instance or "",
+            cfg.session_history or "",
             cfg.latest_image_path,
-            "Waiting for input...",
-            user_input,                  # keep user's text (they typed nothing)
+            "Please type a message first.",
+            user_input,                      # keep whatever the user typed
+            list(reversed(cfg.session_image_paths)),
+            _SEND_VISIBLE,                   # Send stays visible
+            _CANCEL_HIDDEN,                  # Cancel stays hidden
+        )
+        return
+
+    # ── Pre-flight: verify model files exist before touching any session state
+    # This runs BEFORE hiding the Send button so that a misconfigured model
+    # folder never leaves the UI in a broken button state.
+    need_image = (right_mode == "Z-Image-Turbo")
+
+    if not scan_for_gguf(cfg.text_model_folder):
+        # Text model is always required — fail immediately, keep buttons intact.
+        yield (
+            cfg.scenario_log or "",
+            cfg.consolidated_instance or "",
+            cfg.session_history or "",
+            cfg.latest_image_path,
+            "No text model found. Check Configuration → Text Model Folder.",
+            user_input,                      # preserve user's typed message
+            list(reversed(cfg.session_image_paths)),
+            _SEND_VISIBLE,
+            _CANCEL_HIDDEN,
+        )
+        return
+
+    if need_image and not scan_for_gguf(cfg.image_model_folder):
+        # Image model required for Z-Image-Turbo — fail immediately.
+        yield (
+            cfg.scenario_log or "",
+            cfg.consolidated_instance or "",
+            cfg.session_history or "",
+            cfg.latest_image_path,
+            "No image model found. Check Configuration → Image Model Folder, "
+            "or switch Visualizer to 'No Generation'.",
+            user_input,                      # preserve user's typed message
             list(reversed(cfg.session_image_paths)),
             _SEND_VISIBLE,
             _CANCEL_HIDDEN,
@@ -175,24 +224,37 @@ def chat_with_model(user_input: str, right_mode: str):
     # Clear the idle timer — it is now the model's turn, not the user's.
     cfg.user_turn_start_time = None
 
-    # ── Lazy-load models if needed ────────────────────────────────────────
-    if not cfg.text_model_loaded:
+    # ── Lazy-load / verify models before touching any session state ───────
+    # Trigger a load check when:
+    #   • the text model is not yet loaded (always required), OR
+    #   • the image model is not yet loaded AND this turn needs it.
+    # This also catches the case where the text model is loaded but the
+    # image model was never loaded (or was idle-unloaded) while the
+    # Visualizer is set to "Z-Image-Turbo".
+    models_need_check = (
+        not cfg.text_model_loaded
+        or (need_image and not cfg.image_model_loaded)
+    )
+    if models_need_check:
         yield (
             cfg.scenario_log or "",
+            cfg.consolidated_instance or "",
             cfg.session_history or "",
             cfg.latest_image_path,
             "Loading models… please wait.",
-            "",                          # clear input immediately
+            "",                              # clear input — user message is sending
             list(reversed(cfg.session_image_paths)),
             _SEND_HIDDEN,
             _CANCEL_VISIBLE,
         )
-        ok, load_msg = ensure_models_loaded()
+        ok, load_msg = ensure_models_loaded(need_image=need_image)
         if not ok:
             cfg.user_turn_start_time = time.time()
+            # Restore everything — the status bar carries the descriptive error.
             yield (
-                "Models could not be loaded. Check the Configuration tab.",
-                cfg.session_history,
+                cfg.scenario_log or "",
+                cfg.consolidated_instance or "",
+                cfg.session_history or "",
                 cfg.latest_image_path,
                 load_msg,
                 "",
@@ -209,6 +271,7 @@ def chat_with_model(user_input: str, right_mode: str):
     # Show the user's line right away — clear the input box — show Cancel
     yield (
         cfg.scenario_log,
+        cfg.consolidated_instance or "",
         cfg.session_history,
         cfg.latest_image_path,
         "Generating response…",
@@ -218,14 +281,109 @@ def chat_with_model(user_input: str, right_mode: str):
         _CANCEL_VISIBLE,
     )
 
-    # --- Step 1: converse --------------------------------------------------------
-    result = prompt_response("converse")
+    # --- Step 1: converse — one inference call per active agent ------------------
+    # get_active_agents() returns only agents with non-blank names, in slot
+    # order (Agent 1 → 2 → 3), with a single fallback entry when none are set.
+    active_agents = get_active_agents()
+    exchange_lines: list[str] = []   # accumulates "AgentName: response" lines
 
-    # Check for cancellation after the blocking call returns
-    if cfg.cancel_processing or result.get("cancelled"):
+    for agent_name, agent_role in active_agents:
+
+        if cfg.cancel_processing:
+            cfg.user_turn_start_time = time.time()
+            yield (
+                cfg.scenario_log,
+                cfg.consolidated_instance or "",
+                cfg.session_history,
+                cfg.latest_image_path,
+                "Response cancelled.",
+                "",
+                list(reversed(cfg.session_image_paths)),
+                *_restore_buttons(),
+            )
+            return
+
+        # Inform the user which agent is thinking
+        agent_count = len(active_agents)
+        if agent_count > 1:
+            status_msg = f"Generating response… ({agent_name})"
+        else:
+            status_msg = "Generating response…"
+
+        yield (
+            cfg.scenario_log,
+            cfg.consolidated_instance or "",
+            cfg.session_history,
+            cfg.latest_image_path,
+            status_msg,
+            "",
+            list(reversed(cfg.session_image_paths)),
+            _SEND_HIDDEN,
+            _CANCEL_VISIBLE,
+        )
+
+        result = prompt_response("converse", responding_agent=(agent_name, agent_role))
+
+        if cfg.cancel_processing or result.get("cancelled"):
+            cfg.user_turn_start_time = time.time()
+            yield (
+                cfg.scenario_log,
+                cfg.consolidated_instance or "",
+                cfg.session_history,
+                cfg.latest_image_path,
+                "Response cancelled.",
+                "",
+                list(reversed(cfg.session_image_paths)),
+                *_restore_buttons(),
+            )
+            return
+
+        if "error" in result:
+            cfg.user_turn_start_time = time.time()
+            yield (
+                cfg.scenario_log,
+                cfg.consolidated_instance or "",
+                cfg.session_history,
+                cfg.latest_image_path,
+                f"Converse error ({agent_name}): {result['error']}",
+                "",
+                list(reversed(cfg.session_image_paths)),
+                *_restore_buttons(),
+            )
+            return
+
+        # Format and append this agent's line
+        formatted_line = filter_model_output(result["agent_response"], agent_name=agent_name)
+        exchange_lines.append(formatted_line)
+        cfg.scenario_log = cfg.scenario_log + f"\n{formatted_line}"
+
+        # Show this agent's line in the UI immediately before moving to
+        # the next agent, so dialogue streams in naturally.
+        yield (
+            cfg.scenario_log,
+            cfg.consolidated_instance or "",
+            cfg.session_history,
+            cfg.latest_image_path,
+            status_msg,
+            "",
+            list(reversed(cfg.session_image_paths)),
+            _SEND_HIDDEN,
+            _CANCEL_VISIBLE,
+        )
+
+    # Expose the combined exchange for the consolidate / instance steps.
+    # agent_output keeps the last agent's raw line (legacy compat);
+    # agent_exchange holds the full multi-agent block.
+    cfg.agent_output   = exchange_lines[-1] if exchange_lines else ""
+    cfg.agent_exchange = "\n".join(exchange_lines)
+
+    # --- Step 2a: instance — visual snapshot of this rotation ----------------
+    # Runs before consolidate so the image pipeline can use the result.
+    if cfg.cancel_processing:
         cfg.user_turn_start_time = time.time()
         yield (
             cfg.scenario_log,
+            cfg.consolidated_instance or "",
             cfg.session_history,
             cfg.latest_image_path,
             "Response cancelled.",
@@ -235,26 +393,40 @@ def chat_with_model(user_input: str, right_mode: str):
         )
         return
 
-    if "error" in result:
+    yield (
+        cfg.scenario_log,
+        cfg.consolidated_instance or "",
+        cfg.session_history,
+        cfg.latest_image_path,
+        "Generating instance summary…",
+        "",
+        list(reversed(cfg.session_image_paths)),
+        _SEND_HIDDEN,
+        _CANCEL_VISIBLE,
+    )
+
+    instance_result = prompt_response("instance")
+    if cfg.cancel_processing or instance_result.get("cancelled"):
         cfg.user_turn_start_time = time.time()
         yield (
             cfg.scenario_log,
+            cfg.consolidated_instance or "",
             cfg.session_history,
             cfg.latest_image_path,
-            f"Converse error: {result['error']}",
+            "Response cancelled.",
             "",
             list(reversed(cfg.session_image_paths)),
             *_restore_buttons(),
         )
         return
 
-    filtered = filter_model_output(result["agent_response"])
-    cfg.agent_output = filtered
-    cfg.scenario_log = cfg.scenario_log + f"\n{cfg.agent_output}"
+    if "agent_response" in instance_result:
+        cfg.consolidated_instance = instance_result["agent_response"]
 
-    # Yield with new dialogue visible immediately
+    # --- Step 2b: consolidate — update running narrative history -------------
     yield (
         cfg.scenario_log,
+        cfg.consolidated_instance or "",
         cfg.session_history,
         cfg.latest_image_path,
         "Generating history…",
@@ -264,7 +436,6 @@ def chat_with_model(user_input: str, right_mode: str):
         _CANCEL_VISIBLE,
     )
 
-    # --- Step 2: consolidate -----------------------------------------------------
     consolidate = prompt_response("consolidate")
     if not cfg.cancel_processing and not consolidate.get("cancelled") and "error" not in consolidate:
         cfg.session_history = consolidate["agent_response"]
@@ -275,6 +446,7 @@ def chat_with_model(user_input: str, right_mode: str):
         status = "Response cancelled." if cfg.cancel_processing else "Response generated."
         yield (
             cfg.scenario_log,
+            cfg.consolidated_instance or "",
             cfg.session_history,
             cfg.latest_image_path,
             status,
@@ -287,6 +459,7 @@ def chat_with_model(user_input: str, right_mode: str):
     # --- Step 3: generate the visual prompt --------------------------------------
     yield (
         cfg.scenario_log,
+        cfg.consolidated_instance or "",
         cfg.session_history,
         cfg.latest_image_path,
         "Generating prompt…",
@@ -307,6 +480,7 @@ def chat_with_model(user_input: str, right_mode: str):
         cfg.user_turn_start_time = time.time()
         yield (
             cfg.scenario_log,
+            cfg.consolidated_instance or "",
             cfg.session_history,
             cfg.latest_image_path,
             "Response cancelled.",
@@ -322,6 +496,7 @@ def chat_with_model(user_input: str, right_mode: str):
     # --- Step 4: generate the image (threaded with progress polling) --------------
     yield (
         cfg.scenario_log,
+        cfg.consolidated_instance or "",
         cfg.session_history,
         cfg.latest_image_path,
         "Generating image…",
@@ -351,6 +526,7 @@ def chat_with_model(user_input: str, right_mode: str):
             cfg.user_turn_start_time = time.time()
             yield (
                 cfg.scenario_log,
+                cfg.consolidated_instance or "",
                 cfg.session_history,
                 cfg.latest_image_path,
                 "Response cancelled.",
@@ -366,6 +542,7 @@ def chat_with_model(user_input: str, right_mode: str):
             status = "Generating image…"
         yield (
             cfg.scenario_log,
+            cfg.consolidated_instance or "",
             cfg.session_history,
             cfg.latest_image_path,
             status,
@@ -385,6 +562,7 @@ def chat_with_model(user_input: str, right_mode: str):
 
     yield (
         cfg.scenario_log,
+        cfg.consolidated_instance or "",
         cfg.session_history,
         image_path,
         "Response generated with image." if image_path else "Response generated (image failed).",
@@ -708,11 +886,18 @@ def launch_gradio_interface() -> str | None:
                                 "Cancel Response", variant="stop", visible=False
                             )
 
-                        # -- Happenings panel (Consolidated History) --
+                        # -- Happenings panel (Consolidated Instance + Consolidated History) --
                         with gr.Column(visible=False) as happenings_panel:
+                            instance_display = gr.Textbox(
+                                label="Consolidated Instance",
+                                lines=6,
+                                value=cfg.consolidated_instance,
+                                interactive=False,
+                                info="Visual snapshot of the most recent exchange — used for image generation.",
+                            )
                             session_display = gr.Textbox(
                                 label="Consolidated History",
-                                lines=25,
+                                lines=18,
                                 value=cfg.session_history,
                                 interactive=False,
                             )
@@ -888,6 +1073,7 @@ def launch_gradio_interface() -> str | None:
                     inputs=[user_input, right_panel_state],
                     outputs=[
                         bot_response,
+                        instance_display,
                         session_display,
                         generated_image,
                         conv_status,
@@ -911,6 +1097,7 @@ def launch_gradio_interface() -> str | None:
 
                 # ── Restart Session (status bar button) ──────────────────
                 _reset_outputs = [
+                    instance_display,
                     session_display,
                     bot_response,
                     generated_image,

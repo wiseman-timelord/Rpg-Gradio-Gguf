@@ -68,6 +68,8 @@ session_history: str = ""
 scenario_log: str = ""
 human_input: str = ""
 agent_output: str = ""
+agent_exchange: str = ""        # full multi-agent response block, e.g. "Agent1: ...\nAgent2: ..."
+consolidated_instance: str = "" # LLM summary of the most recent single rotation (used for image prompts)
 rotation_counter: int = 0
 latest_image_path: str | None = None
 
@@ -156,6 +158,11 @@ PROMPT_TO_SETTINGS: dict = {
         "temperature": 0.5,
         "repeat_penalty": 1.0,
         "max_tokens": 1500,
+    },
+    "instance": {
+        "temperature": 0.5,
+        "repeat_penalty": 1.0,
+        "max_tokens": 400,
     },
     "image_prompt": {
         "temperature": 0.6,

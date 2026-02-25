@@ -127,6 +127,7 @@ def reset_session_state() -> None:
     cfg.session_history = cfg.default_history
     cfg.scenario_log = ""
     cfg.agent_output = ""
+    cfg.agent_exchange = ""
     cfg.human_input = ""
     cfg.rotation_counter = 0
     cfg.latest_image_path = None
