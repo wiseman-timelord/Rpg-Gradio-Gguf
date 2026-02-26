@@ -249,7 +249,7 @@ Here is some info about the modesls...
 ```
 
 ### Notation
-- v1 of the program was Ubuntu. It did not use Z-Image-Turbo. At some point like, when 1Million context is, the normal thing and fugured out correctly, then this project may become Dual-Mode Windows/Linux scripts.
+- v1 of the program was Ubuntu. It did not use Z-Image-Turbo. At some point this project may become Dual-Mode Windows/Linux scripts.
 
 ### Test Examples
 ```
