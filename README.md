@@ -216,8 +216,8 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 - Windows - Windows 10(b1809+)-11
 - Python - 3.10-3.12 Only
 - Powershell - 5.1+ (built in to windows 10/11)
-- LLMs - For the 2 models we are using, see Models section.
 - CPU - Any x64 Cpu, the more threads the better. Testing was done on 20/24 threads. 
+- RAM - Enough to cover the models we are using, see Models section.
 - GPU - Vulkan capable GPU Only, it uses vulkan. Also install the latest Vulkan SDK, that your GPU/OS supports.
 - Internet - Installer requires internet, main program will be offline. 
 
@@ -225,6 +225,7 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 Here is some info about the modesls...
 - Text model: [Qwen3-4b-Z-Image-Turbo-AbliteratedV1](https://huggingface.co/mradermacher/Qwen3-4b-Z-Image-Turbo-AbliteratedV1-GGUF). This gives you your uncensored RPG brain, and creates quality prompt for image generation.
 - Image model: [Z-Image-Turbo-GGUF](https://huggingface.co/vantagewithai/Z-Image-Turbo-GGUF). This enables image generation. 
+- ae.safetensors: Automatically downloaded to ".\models" by installer, copied to set image model folder, required for Z-Image-Turbo to work. 
 
 ### Install and Use
 - Instructions for installation...
