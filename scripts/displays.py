@@ -70,7 +70,7 @@ def build_workflow_visualization(current_stage: int, completed_stages: list[int]
         if idx in completed_stages:
             icon = "✓"
         elif idx == current_stage:
-            icon = "★"
+            icon = "★"  # Star for active/processing stage
         else:
             icon = "○"
         lines.append(f"{icon} {stage}")
@@ -90,6 +90,7 @@ def shutdown() -> None:
     if cfg.shutdown_fn is not None:
         cfg.shutdown_fn()
     else:
+        # Safety fallback — should never happen in normal operation
         print("WARNING: shutdown_fn not registered. Force exiting.")
         os._exit(1)
 
@@ -106,14 +107,17 @@ def reset_session():
     
     workflow_viz = build_workflow_visualization(-1, [])
     
+    # Returns: instance_display, session_display, bot_response,
+    #          generated_image, conv_status, user_input (cleared + visible),
+    #          sequence_gallery, send_btn (visible), cancel_btn (hidden),
+    #          workflow_progress (cleared + hidden)
     return (
         " ", cfg.session_history, " ", placeholder, "Session restarted. ",
-        gr.update(value=" ", visible=True),
+        gr.update(value=" ", visible=True),  # user_input
         [],
-        gr.update(visible=True),
-        gr.update(visible=False),
-        gr.update(value=workflow_viz, visible=False),
-        False,  # is_processing state
+        gr.update(visible=True),   # send_btn
+        gr.update(visible=False),  # cancel_btn
+        gr.update(value=workflow_viz, visible=False),  # workflow_progress
     )
 
 def cancel_response():
@@ -122,13 +126,14 @@ def cancel_response():
     Sets cfg.cancel_processing = True so that each subsequent call to
     prompt_response() or generate_image() in the pipeline skips its work.
     Also restores the Send / Cancel button visibility immediately.
+
+    Returns (status_text, send_btn_update, cancel_btn_update).
     """
     cfg.cancel_processing = True
     return (
         "Cancelling…",
-        gr.update(visible=True),
-        gr.update(visible=False),
-        True,  # is_processing stays True until pipeline fully exits
+        gr.update(visible=True),   # show Send Message
+        gr.update(visible=False),  # hide Cancel Response
     )
 
 def filter_model_output(raw: str, agent_name: str | None = None) -> str:
@@ -139,44 +144,80 @@ def filter_model_output(raw: str, agent_name: str | None = None) -> str:
         return f"{name}: {after.strip()}"
     return f"{name}: {raw}"
 
-def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
+def chat_with_model(user_input: str, right_mode: str):
     """
     Main conversation loop: converse → consolidate → [image_prompt → image].
-    
-    Yields 11 values every iteration:
+    Image generation (steps 3 & 4) is only performed when right_mode is
+    "Z-Image-Turbo".  When right_mode is "No Generation" the pipeline stops
+    after consolidation and keeps the existing latest_image_path on screen.
+
+    This is a **generator** — it yields partial updates at each pipeline
+    stage so the Gradio UI refreshes progressively instead of blocking
+    until the entire pipeline finishes.
+
+    Yields 10 values every iteration:
         (scenario_log, instance_display, session_history, image, status,
          user_input_update, sequence_gallery, send_btn_update, cancel_btn_update,
-         workflow_progress_update, is_processing_update)
+         workflow_progress_update)
+
+    While the pipeline is running the Send button is hidden and the Cancel
+    Response button is visible. Both are restored before the generator
+    returns so the user can type another message.
+
+    cfg.cancel_processing is reset to False at the start of each call and
+    is set to True by cancel_response() when the user clicks Cancel. Each
+    inference step checks the flag before starting; if set, remaining steps
+    are skipped and control is returned to the user.
     """
 
+    # Convenience aliases for button update tuples
     _SEND_HIDDEN   = gr.update(visible=False)
     _SEND_VISIBLE  = gr.update(visible=True)
     _CANCEL_HIDDEN = gr.update(visible=False)
     _CANCEL_VISIBLE = gr.update(visible=True)
 
     def _restore_buttons():
+        """Return (send_update, cancel_update) that restore the normal state."""
         return _SEND_VISIBLE, _CANCEL_HIDDEN
 
     def _start_stage(stage_idx: int) -> str:
-        """Mark the PREVIOUS stage as complete, then set current stage as active."""
+        """
+        Mark the PREVIOUS stage as complete, then set current stage as active.
+        Returns the workflow visualization string.
+        ★ = currently processing, ✓ = completed, ○ = pending
+        """
+        # Mark previous stage as complete (if any)
         if cfg.workflow_stage_index >= 0 and cfg.workflow_stage_index not in cfg.workflow_completed_stages:
             cfg.workflow_completed_stages.append(cfg.workflow_stage_index)
+        
+        # Set new active stage
         cfg.workflow_stage_index = stage_idx
-        return build_workflow_visualization(cfg.workflow_stage_index, cfg.workflow_completed_stages)
+        return build_workflow_visualization(
+            cfg.workflow_stage_index, 
+            cfg.workflow_completed_stages
+        )
 
     def _complete_all_stages() -> str:
         """Mark all stages as complete and return visualization."""
         for idx in range(len(cfg.WORKFLOW_STAGES)):
             if idx not in cfg.workflow_completed_stages:
                 cfg.workflow_completed_stages.append(idx)
-        cfg.workflow_stage_index = -1
+        cfg.workflow_stage_index = -1  # No active stage
         return build_workflow_visualization(-1, cfg.workflow_completed_stages)
 
+    # ── DEFENSIVE RESET: Ensure workflow state is consistent at start of turn ──
+    # Prevents corrupted indices from causing visibility logic errors when switching panels
+    if cfg.workflow_stage_index < -1 or cfg.workflow_stage_index > 5:
+        print(f"[chat_with_model] WARNING: Resetting invalid workflow_stage_index={cfg.workflow_stage_index}")
+        cfg.workflow_stage_index = -1
+        cfg.workflow_completed_stages = []
+    
+    # Reset cancel flag and workflow tracking for this new turn
     cfg.cancel_processing = False
     cfg.workflow_stage_index = -1
     cfg.workflow_completed_stages = []
 
-    # Empty input guard
+    # ── Empty input guard — never hide Send or alter the Scenario Log ─────
     if not user_input.strip():
         workflow_viz = build_workflow_visualization(-1, [])
         yield (
@@ -185,15 +226,15 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
             cfg.session_history or " ",
             cfg.latest_image_path,
             "Please type a message first. ",
-            gr.update(value=user_input, visible=True),
+            gr.update(value=user_input, visible=True),  # keep input visible
             list(reversed(cfg.session_image_paths)),
             _SEND_VISIBLE,
             _CANCEL_HIDDEN,
-            gr.update(value=workflow_viz, visible=False),
-            False,  # is_processing
+            gr.update(value=workflow_viz, visible=False),  # hide workflow
         )
         return
 
+    # ── Pre-flight: verify model files exist before touching any session state
     need_image = (right_mode == "Z-Image-Turbo")
 
     if not scan_for_gguf(cfg.text_model_folder):
@@ -209,7 +250,6 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
             _SEND_VISIBLE,
             _CANCEL_HIDDEN,
             gr.update(value=workflow_viz, visible=False),
-            False,
         )
         return
 
@@ -227,30 +267,31 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
             _SEND_VISIBLE,
             _CANCEL_HIDDEN,
             gr.update(value=workflow_viz, visible=False),
-            False,
         )
         return
 
+    # Clear the idle timer — it is now the model's turn, not the user's.
     cfg.user_turn_start_time = None
 
+    # ── Lazy-load / verify models before touching any session state ────────
     models_need_check = (
         not cfg.text_model_loaded
         or (need_image and not cfg.image_model_loaded)
     )
     if models_need_check:
-        workflow_viz = _start_stage(0)
+        # Hide user input, show workflow progress
+        workflow_viz = _start_stage(0)  # Stage 0: Initial Preparation (★ on stage 0)
         yield (
             cfg.scenario_log or " ",
             cfg.consolidated_instance or " ",
             cfg.session_history or " ",
             cfg.latest_image_path,
             "Loading models… please wait. ",
-            gr.update(value=" ", visible=False),
+            gr.update(value=" ", visible=False),  # hide user_input
             list(reversed(cfg.session_image_paths)),
             _SEND_HIDDEN,
             _CANCEL_VISIBLE,
-            gr.update(value=workflow_viz, visible=True),
-            True,  # is_processing
+            gr.update(value=workflow_viz, visible=True),  # show workflow
         )
         ok, load_msg = ensure_models_loaded(need_image=need_image)
         if not ok:
@@ -264,36 +305,39 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
                 cfg.session_history or " ",
                 cfg.latest_image_path,
                 load_msg,
-                gr.update(value=" ", visible=True),
+                gr.update(value=" ", visible=True),  # restore user_input
                 list(reversed(cfg.session_image_paths)),
                 *_restore_buttons(),
-                gr.update(value=workflow_viz, visible=False),
-                False,  # is_processing
+                gr.update(value=workflow_viz, visible=False),  # hide workflow
             )
             return
 
     cfg.human_input = user_input.strip()
+
+    # Append the user's line to the running scenario log immediately
     cfg.scenario_log = (cfg.scenario_log + f"\n{cfg.human_name}: {cfg.human_input} ").lstrip()
 
-    workflow_viz = _start_stage(0)
+    # Show the user's line right away — clear and hide input box — show Cancel + workflow
+    workflow_viz = _start_stage(0)  # Stage 0: Still in preparation (★ on stage 0)
     yield (
         cfg.scenario_log,
         cfg.consolidated_instance or " ",
         cfg.session_history,
         cfg.latest_image_path,
         "Generating response… ",
-        gr.update(value=" ", visible=False),
+        gr.update(value=" ", visible=False),  # hide user_input
         list(reversed(cfg.session_image_paths)),
         _SEND_HIDDEN,
         _CANCEL_VISIBLE,
-        gr.update(value=workflow_viz, visible=True),
-        True,  # is_processing
+        gr.update(value=workflow_viz, visible=True),  # show workflow
     )
 
+    # --- Step 1: converse — one inference call per active agent ------------------
     active_agents = get_active_agents()
     exchange_lines: list[str] = []
 
     for agent_name, agent_role in active_agents:
+
         if cfg.cancel_processing:
             cfg.user_turn_start_time = time.time()
             cfg.workflow_stage_index = -1
@@ -305,11 +349,10 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
                 cfg.session_history,
                 cfg.latest_image_path,
                 "Response cancelled. ",
-                gr.update(value=" ", visible=True),
+                gr.update(value=" ", visible=True),  # restore user_input
                 list(reversed(cfg.session_image_paths)),
                 *_restore_buttons(),
-                gr.update(value=workflow_viz, visible=False),
-                False,  # is_processing
+                gr.update(value=workflow_viz, visible=False),  # hide workflow
             )
             return
 
@@ -319,6 +362,7 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
         else:
             status_msg = "Generating response… "
 
+        # Stage 1: Character Responses (★ moves to stage 1, stage 0 becomes ✓)
         workflow_viz = _start_stage(1)
         yield (
             cfg.scenario_log,
@@ -326,12 +370,11 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
             cfg.session_history,
             cfg.latest_image_path,
             status_msg,
-            gr.update(value=" ", visible=False),
+            gr.update(value=" ", visible=False),  # keep hidden
             list(reversed(cfg.session_image_paths)),
             _SEND_HIDDEN,
             _CANCEL_VISIBLE,
-            gr.update(value=workflow_viz, visible=True),
-            True,  # is_processing
+            gr.update(value=workflow_viz, visible=True),  # keep visible
         )
 
         result = prompt_response("converse", responding_agent=(agent_name, agent_role))
@@ -351,7 +394,6 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
                 list(reversed(cfg.session_image_paths)),
                 *_restore_buttons(),
                 gr.update(value=workflow_viz, visible=False),
-                False,  # is_processing
             )
             return
 
@@ -370,7 +412,6 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
                 list(reversed(cfg.session_image_paths)),
                 *_restore_buttons(),
                 gr.update(value=workflow_viz, visible=False),
-                False,  # is_processing
             )
             return
 
@@ -389,12 +430,12 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
             _SEND_HIDDEN,
             _CANCEL_VISIBLE,
             gr.update(value=workflow_viz, visible=True),
-            True,  # is_processing
         )
 
-    cfg.agent_output = exchange_lines[-1] if exchange_lines else " "
+    cfg.agent_output   = exchange_lines[-1] if exchange_lines else " "
     cfg.agent_exchange = "\n".join(exchange_lines)
 
+    # --- Step 2a: instance — visual snapshot of this rotation ----------------
     if cfg.cancel_processing:
         cfg.user_turn_start_time = time.time()
         cfg.workflow_stage_index = -1
@@ -410,10 +451,10 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
             list(reversed(cfg.session_image_paths)),
             *_restore_buttons(),
             gr.update(value=workflow_viz, visible=False),
-            False,  # is_processing
         )
         return
 
+    # Stage 2: Instance Summary (★ moves to stage 2, stage 1 becomes ✓)
     workflow_viz = _start_stage(2)
     yield (
         cfg.scenario_log,
@@ -426,7 +467,6 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
         _SEND_HIDDEN,
         _CANCEL_VISIBLE,
         gr.update(value=workflow_viz, visible=True),
-        True,  # is_processing
     )
 
     instance_result = prompt_response("instance")
@@ -445,13 +485,14 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
             list(reversed(cfg.session_image_paths)),
             *_restore_buttons(),
             gr.update(value=workflow_viz, visible=False),
-            False,  # is_processing
         )
         return
 
     if "agent_response" in instance_result:
         cfg.consolidated_instance = instance_result["agent_response"]
 
+    # --- Step 2b: consolidate — update running narrative history -------------
+    # Stage 3: History Consolidation (★ moves to stage 3, stage 2 becomes ✓)
     workflow_viz = _start_stage(3)
     yield (
         cfg.scenario_log,
@@ -464,16 +505,17 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
         _SEND_HIDDEN,
         _CANCEL_VISIBLE,
         gr.update(value=workflow_viz, visible=True),
-        True,  # is_processing
     )
 
     consolidate = prompt_response("consolidate")
     if not cfg.cancel_processing and not consolidate.get("cancelled") and "error" not in consolidate:
         cfg.session_history = consolidate["agent_response"]
 
+    # ── Image generation — only when Visualizer mode is "Z-Image-Turbo" ──────────
     if cfg.cancel_processing or right_mode != "Z-Image-Turbo":
         cfg.user_turn_start_time = time.time()
         status = "Response cancelled. " if cfg.cancel_processing else "Response generated. "
+        # Mark all reached stages as complete before returning
         workflow_viz = _complete_all_stages()
         yield (
             cfg.scenario_log,
@@ -481,14 +523,15 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
             cfg.session_history,
             cfg.latest_image_path,
             status,
-            gr.update(value=" ", visible=True),
+            gr.update(value=" ", visible=True),  # RESTORE user input
             list(reversed(cfg.session_image_paths)),
             *_restore_buttons(),
-            gr.update(value=workflow_viz, visible=False),
-            False,  # is_processing
+            gr.update(value=workflow_viz, visible=False),  # HIDE workflow
         )
         return
 
+    # --- Step 3: generate the visual prompt --------------------------------------
+    # Stage 4: Encoding Prompt (★ moves to stage 4, stage 3 becomes ✓)
     workflow_viz = _start_stage(4)
     yield (
         cfg.scenario_log,
@@ -501,7 +544,6 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
         _SEND_HIDDEN,
         _CANCEL_VISIBLE,
         gr.update(value=workflow_viz, visible=True),
-        True,  # is_processing
     )
 
     visual_prompt = None
@@ -526,13 +568,14 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
             list(reversed(cfg.session_image_paths)),
             *_restore_buttons(),
             gr.update(value=workflow_viz, visible=False),
-            False,  # is_processing
         )
         return
 
     if not visual_prompt:
         visual_prompt = f"A scene at {cfg.scene_location}. "
 
+    # --- Step 4: generate the image (threaded with progress polling) --------------
+    # Stage 5: Image Generation (★ moves to stage 5, stage 4 becomes ✓)
     workflow_viz = _start_stage(5)
     yield (
         cfg.scenario_log,
@@ -545,7 +588,6 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
         _SEND_HIDDEN,
         _CANCEL_VISIBLE,
         gr.update(value=workflow_viz, visible=True),
-        True,  # is_processing
     )
 
     _img_result: dict = {"path": None, "done": False}
@@ -574,7 +616,6 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
                 list(reversed(cfg.session_image_paths)),
                 *_restore_buttons(),
                 gr.update(value=workflow_viz, visible=False),
-                False,  # is_processing
             )
             return
         step, total = get_image_gen_progress()
@@ -593,7 +634,6 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
             _SEND_HIDDEN,
             _CANCEL_VISIBLE,
             gr.update(value=workflow_viz, visible=True),
-            True,  # is_processing
         )
         time.sleep(1.0)
 
@@ -601,71 +641,86 @@ def chat_with_model(user_input: str, right_mode: str, is_processing: bool):
     image_path = _img_result["path"]
     cfg.latest_image_path = image_path
 
+    # Control returns to user — mark ALL stages complete, show briefly, then restore
     cfg.user_turn_start_time = time.time()
+    
+    # Mark all stages as complete (including Image Generation now that it's done)
     workflow_viz = _complete_all_stages()
     
+    # Show all-complete state for 1 second so user sees everything ticked
     yield (
         cfg.scenario_log,
         cfg.consolidated_instance or " ",
         cfg.session_history,
         image_path,
         "Response complete! ",
-        gr.update(value=" ", visible=False),
+        gr.update(value=" ", visible=False),  # keep hidden briefly
         list(reversed(cfg.session_image_paths)),
         _SEND_HIDDEN,
         _CANCEL_VISIBLE,
-        gr.update(value=workflow_viz, visible=True),
-        True,  # is_processing (still, for the 1s pause)
+        gr.update(value=workflow_viz, visible=True),  # keep visible with all ✓
     )
-    time.sleep(1.0)
+    time.sleep(1.0)  # Brief pause to show all stages complete
     
+    # Now restore user input and hide workflow
     yield (
         cfg.scenario_log,
         cfg.consolidated_instance or " ",
         cfg.session_history,
         image_path,
         "Response generated with image. " if image_path else "Response generated (image failed). ",
-        gr.update(value=" ", visible=True),
+        gr.update(value=" ", visible=True),  # RESTORE user_input
         list(reversed(cfg.session_image_paths)),
         *_restore_buttons(),
-        gr.update(value=workflow_viz, visible=False),
-        False,  # is_processing
+        gr.update(value=workflow_viz, visible=False),  # HIDE workflow
     )
     return
 
 # -----------------------------------------------------------------------
 # Panel switching callbacks
 # -----------------------------------------------------------------------
-def switch_left_panel(mode: str, is_processing: bool):
-    """
-    Toggle visibility of Interactions / Happenings / Personalize panels.
-    CRITICAL: When returning to Interactions, restore correct component
-    visibility based on is_processing state.
-    """
-    if is_processing:
-        # Processing state: hide user_input, show workflow_progress, hide send, show cancel
-        interaction_updates = (
-            gr.update(visible=True),  # interaction_panel itself
-            gr.update(visible=(mode == "Happenings")),
-            gr.update(visible=(mode == "Personalize")),
-            gr.update(visible=False),  # user_input
-            gr.update(visible=True),   # workflow_progress
-            gr.update(visible=False),  # send_btn
-            gr.update(visible=True),   # cancel_btn
-        )
-    else:
-        # Idle state: show user_input, hide workflow_progress, show send, hide cancel
-        interaction_updates = (
-            gr.update(visible=True),  # interaction_panel itself
-            gr.update(visible=(mode == "Happenings")),
-            gr.update(visible=(mode == "Personalize")),
-            gr.update(visible=True),   # user_input
-            gr.update(visible=False),  # workflow_progress
-            gr.update(visible=True),   # send_btn
-            gr.update(visible=False),  # cancel_btn
-        )
+def switch_left_panel(mode: str):
+    """Toggle visibility of Interactions / Happenings / Personalize panels.
     
-    return interaction_updates
+    Uses cfg.user_turn_start_time as the canonical indicator:
+    - None = model is processing (show cancel/workflow, hide input/send)
+    - float = user's turn (show input/send, hide cancel/workflow)
+    
+    This aligns panel-switching logic with the inference pipeline state.
+    """
+    # === CANONICAL STATE CHECK ===
+    # user_turn_start_time is the authoritative source:
+    # - None → model processing (hide input/send, show cancel/workflow)
+    # - float → user's turn (show input/send, hide cancel/workflow)
+    is_users_turn = (cfg.user_turn_start_time is not None)
+    
+    # === Determine visibility based on turn state ===
+    if is_users_turn:
+        # User's turn: show input/send, hide cancel/workflow
+        user_input_vis, send_btn_vis = True, True
+        cancel_btn_vis, workflow_vis = False, False
+    else:
+        # Model processing: hide input/send, show cancel/workflow
+        user_input_vis, send_btn_vis = False, False
+        cancel_btn_vis, workflow_vis = True, True
+
+    # === Debug logging (remove after verification) ===
+    print(f"[switch_left_panel] mode='{mode}', "
+          f"user_turn_start_time={cfg.user_turn_start_time}, "
+          f"is_users_turn={is_users_turn}, "
+          f"→ user_input:{user_input_vis}, send:{send_btn_vis}, "
+          f"cancel:{cancel_btn_vis}, workflow:{workflow_vis}")
+
+    # === Return visibility updates in EXACT order matching left_mode.change outputs ===
+    return (
+        gr.update(visible=(mode == "Interactions")),   # interaction_panel
+        gr.update(visible=(mode == "Happenings")),     # happenings_panel  
+        gr.update(visible=(mode == "Personalize")),    # personalize_panel
+        gr.update(visible=user_input_vis),             # user_input (Your Message)
+        gr.update(visible=send_btn_vis),               # send_btn (Send Message)
+        gr.update(visible=cancel_btn_vis),             # cancel_btn (Cancel Response)
+        gr.update(visible=workflow_vis),               # workflow_progress
+    )
 
 def switch_right_panel_and_state(mode: str):
     """Update the Visualizer mode state."""
@@ -867,14 +922,13 @@ def launch_gradio_interface() -> str | None:
     }
     """
 
+    # Create Blocks WITHOUT css/js parameters (Gradio 6.0 compatibility)
     with gr.Blocks(title="Rpg-Gradio-Gguf") as interface:
         gr.Markdown("# ⚔️ Rpg-Gradio-Gguf")
 
         with gr.Tabs():
             with gr.Tab("Conversation"):
                 right_panel_state = gr.State("Z-Image-Turbo")
-                # NEW: Track processing state for panel switching
-                is_processing_state = gr.State(False)
 
                 with gr.Row():
                     with gr.Column(scale=1):
@@ -891,6 +945,7 @@ def launch_gradio_interface() -> str | None:
                                 lines=16,
                                 interactive=False,
                             )
+                            # User Message Input — visible by default
                             user_input = gr.Textbox(
                                 label="Your Message ",
                                 lines=6,
@@ -898,12 +953,13 @@ def launch_gradio_interface() -> str | None:
                                 interactive=True,
                                 visible=True,
                             )
+                            # Workflow Progress — hidden by default
                             workflow_progress = gr.Textbox(
                                 label="Workflow Progress ",
                                 lines=6,
                                 value=build_workflow_visualization(-1, []),
                                 interactive=False,
-                                visible=False,
+                                visible=False,  # KEY: start hidden
                                 elem_id="workflow_progress",
                             )
                             send_btn = gr.Button("Send Message ", visible=True)
@@ -913,7 +969,7 @@ def launch_gradio_interface() -> str | None:
 
                         with gr.Column(visible=False) as happenings_panel:
                             instance_display = gr.Textbox(
-                                label="Consolidated Instance ",
+                                label="Instance Summary",
                                 lines=6,
                                 value=cfg.consolidated_instance,
                                 interactive=False,
@@ -1006,18 +1062,17 @@ def launch_gradio_interface() -> str | None:
                         restart_btn = gr.Button("Restart Session ", variant="primary")
                         exit_conv = gr.Button("Exit Program ", variant="stop")
 
-                # FIX: Panel switching now includes is_processing_state and returns component visibility
                 left_mode.change(
                     fn=switch_left_panel,
-                    inputs=[left_mode, is_processing_state],
+                    inputs=left_mode,
                     outputs=[
-                        interaction_panel,
-                        happenings_panel,
+                        interaction_panel, 
+                        happenings_panel, 
                         personalize_panel,
-                        user_input,
-                        workflow_progress,
-                        send_btn,
-                        cancel_btn,
+                        user_input,        # NEW: restore input visibility
+                        send_btn,          # NEW: restore send button visibility
+                        cancel_btn,        # NEW: restore cancel button visibility
+                        workflow_progress, # NEW: restore workflow visibility
                     ],
                 )
 
@@ -1033,28 +1088,28 @@ def launch_gradio_interface() -> str | None:
                     outputs=generated_image,
                 )
 
+                # Send button: outputs include gr.update() for user_input and workflow_progress
                 send_btn.click(
                     fn=chat_with_model,
-                    inputs=[user_input, right_panel_state, is_processing_state],
+                    inputs=[user_input, right_panel_state],
                     outputs=[
                         bot_response,
                         instance_display,
                         session_display,
                         generated_image,
                         conv_status,
-                        user_input,
+                        user_input,          # gr.update(value=..., visible=...)
                         sequence_gallery,
                         send_btn,
                         cancel_btn,
-                        workflow_progress,
-                        is_processing_state,
+                        workflow_progress,   # gr.update(value=..., visible=...)
                     ],
                 )
 
                 cancel_btn.click(
                     fn=cancel_response,
                     inputs=[],
-                    outputs=[conv_status, send_btn, cancel_btn, is_processing_state],
+                    outputs=[conv_status, send_btn, cancel_btn],
                 )
 
                 _reset_outputs = [
@@ -1068,7 +1123,6 @@ def launch_gradio_interface() -> str | None:
                     send_btn,
                     cancel_btn,
                     workflow_progress,
-                    is_processing_state,
                 ]
                 restart_btn.click(
                     fn=reset_session, inputs=[], outputs=_reset_outputs
@@ -1219,6 +1273,7 @@ def launch_gradio_interface() -> str | None:
 
                 exit_cfg.click(fn=shutdown, inputs=[], outputs=[])
 
+    # Pass css/js to launch() instead of Blocks() (Gradio 6.0 compatibility)
     interface.queue()
     _app, local_url, _share_url = interface.launch(
         inbrowser=False,
