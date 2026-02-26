@@ -1,27 +1,25 @@
-# launcher.py
+# Script: .\launcher.py
 # Entry point for Rpg-Gradio-Gguf.
 # Loads persistent configuration, initializes models, and launches the UI.
-#
 # LAUNCH MODES  (both use the same pywebview window)
 # --------------------------------------------------
 # Normal  (pythonw.exe via batch option 1):
-#   stdout/stderr → ./logs/launcher.log  (pythonw has no console)
-#
+# stdout/stderr → ./logs/launcher.log  (pythonw has no console)
 # Debug   (python.exe via batch option 2):
-#   stdout/stderr → console  (console window stays open)
-#
+# stdout/stderr → console  (console window stays open)
 # In both cases Gradio starts non-blocking and pywebview opens a native
 # application window.  Closing the window [X] or clicking "Exit Program"
 # triggers shutdown() which destroys the pywebview window, unblocks
 # webview.start(), and terminates the process.
 
+# Imports...
 import os
 import sys
 import time
 import threading
 import atexit
 import platform
-
+import scripts.configure as cfg
 # Ensure project root is on sys.path so `scripts` package resolves
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -32,14 +30,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # ---------------------------------------------------------------------------
 _log_file = None  # keep a reference so it isn't garbage-collected
 
-
 def _setup_logging() -> None:
     """Redirect stdout/stderr to a log file when running without a console."""
     global _log_file
     if sys.stdout is not None and sys.stderr is not None:
         # Console is available (debug mode) — nothing to do
         return
-
     log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
     os.makedirs(log_dir, exist_ok=True)
     log_path = os.path.join(log_dir, "launcher.log")
@@ -49,7 +45,6 @@ def _setup_logging() -> None:
     sys.stderr = _log_file
     atexit.register(_close_log)
     print(f"Log started — output redirected to {log_path}")
-
 
 def _close_log() -> None:
     global _log_file
@@ -61,10 +56,47 @@ def _close_log() -> None:
             pass
         _log_file = None
 
-
 # Call immediately — before any other import that might print
 _setup_logging()
 
+# ---------------------------------------------------------------------------
+# Vulkan Backend Optimizations — MUST run BEFORE llama_cpp import
+# ---------------------------------------------------------------------------
+def _apply_vulkan_optimizations() -> None:
+    """
+    Set GGML Vulkan environment variables for optimal performance.
+    MUST be called before any import of llama_cpp or scripts.inference.
+    """
+    import os
+
+    # Enable SPIR-V shader pipeline caching (critical for Z-Image-Turbo diffusion)
+    # 0 = caching enabled (default), 1 = disabled
+    os.environ.setdefault("GGML_VK_NO_PIPELINE_CACHE", "0")
+
+    # Disable verbose Vulkan debug/validation logging (reduces CPU overhead)
+    # 0 = off (production), 1 = on (debugging)
+    os.environ.setdefault("GGML_VK_DEBUG", "0")
+
+    # Cap Vulkan memory allocations to reduce fragmentation when running dual models
+    # Tune based on vram_assigned; 256 is safe for 8–12 GB, 512 for 16+ GB
+    if cfg.vram_assigned <= 12288:
+        os.environ.setdefault("GGML_VK_MAX_ALLOCATIONS", "256")
+    else:
+        os.environ.setdefault("GGML_VK_MAX_ALLOCATIONS", "512")
+
+    # Ensure thread affinity doesn't conflict with Gradio's async event loop
+    os.environ.setdefault("KMP_AFFINITY", "none")
+
+    # Optional: reduce Vulkan memory pooling overhead (experimental)
+    # os.environ.setdefault("GGML_VK_USE_HOST_MEMORY", "1")
+
+    print(f"Vulkan optimizations: "
+          f"pipeline_cache=enabled, debug=off, "
+          f"max_alloc={os.environ.get('GGML_VK_MAX_ALLOCATIONS')}, "
+          f"affinity=none")
+
+# Call immediately — BEFORE any llama_cpp imports occur
+_apply_vulkan_optimizations()
 
 # ---------------------------------------------------------------------------
 # Windows: set AppUserModelID so the taskbar shows our icon, not Python's.
@@ -79,12 +111,10 @@ if platform.system() == "Windows":
     except Exception:
         pass
 
-
 def _set_window_icon_win32(icon_path: str, window_title: str = "Rpg-Gradio-Gguf") -> None:
     """
     Set the titlebar (small) and taskbar (big) icon on a Windows window
     using ctypes calls to user32.dll.
-
     pywebview's ``webview.start(icon=...)`` only works on GTK/QT, so on
     Windows we must call LoadImageW + SendMessageW directly.
 
@@ -137,7 +167,6 @@ def _set_window_icon_win32(icon_path: str, window_title: str = "Rpg-Gradio-Gguf"
     except Exception as e:
         print(f"  Could not set window icon: {e}")
 
-
 # ---------------------------------------------------------------------------
 # Verify pywebview is available — fail early if not installed
 # ---------------------------------------------------------------------------
@@ -148,12 +177,11 @@ except ImportError:
     print("Run the installer (batch option 3) to install all dependencies.")
     sys.exit(1)
 
-
 # Now safe to import project modules (they print during import)
+# Vulkan env vars are already set above, so llama_cpp will pick them up
 from scripts import configure as cfg
 from scripts.inference import load_text_model, load_image_model, unload_text_model, unload_image_model
 from scripts.displays import launch_gradio_interface
-
 
 # ---------------------------------------------------------------------------
 # Shutdown  (registered on cfg so displays.py can call it)
@@ -161,9 +189,8 @@ from scripts.displays import launch_gradio_interface
 def shutdown() -> None:
     """
     Clean shutdown for the entire application.
-
     Called from two places:
-      • "Exit Program" button in Gradio  (via cfg.shutdown_fn)
+      •  "Exit Program" button in Gradio  (via cfg.shutdown_fn)
       • pywebview window [X] close       (webview.start() unblocks naturally)
 
     Unloads any loaded models before destroying the pywebview window so that
@@ -192,13 +219,12 @@ def shutdown() -> None:
             win.destroy()
     except Exception as e:
         print(f"Error destroying webview windows: {e}")
+
     # If window destruction didn't unblock main, force exit after a moment
     threading.Timer(2.0, lambda: os._exit(0)).start()
 
-
 # Register on cfg so displays.py can call it without circular imports
 cfg.shutdown_fn = shutdown
-
 
 # ---------------------------------------------------------------------------
 # Startup helpers
@@ -210,16 +236,14 @@ def load_persistent_settings() -> None:
     # Seed session_history from default_history for the initial session
     cfg.session_history = cfg.default_history
     print(
-        f"  Agent 1: {cfg.agent1_name} | Agent 2: {cfg.agent2_name} | "
-        f"Human: {cfg.human_name} | "
+        f"  Agent 1: {cfg.agent1_name} | Agent 2: {cfg.agent2_name} |  "
+        f"Human: {cfg.human_name} |  "
         f"Threads: {cfg.optimal_threads} | VRAM: {cfg.vram_assigned} MB"
     )
-
 
 def initialize_models() -> None:
     """Load text and image GGUF models."""
     print("Initializing models...")
-
     if load_text_model():
         print("Text model loaded successfully.")
     else:
@@ -230,12 +254,10 @@ def initialize_models() -> None:
     else:
         print("WARNING: Image model not loaded. Image generation will be skipped.")
 
-
 def idle_unload_watcher() -> None:
     """
     Background daemon thread — unloads models after IDLE_UNLOAD_SECONDS of
     user inactivity.
-
     The idle clock is measured by cfg.user_turn_start_time:
       • None  → model is processing (not user's turn); do nothing.
       • float → timestamp of when control returned to the user.
@@ -245,7 +267,7 @@ def idle_unload_watcher() -> None:
     to unload again.  The next call to chat_with_model() will lazy-reload
     the models automatically.
     """
-    print("Idle-unload watcher started "
+    print(f"Idle-unload watcher started  "
           f"(timeout: {cfg.IDLE_UNLOAD_SECONDS // 60} min).")
     while True:
         try:
@@ -259,12 +281,11 @@ def idle_unload_watcher() -> None:
                         unload_text_model()
                     if cfg.image_model_loaded:
                         unload_image_model()
-                    print("Models unloaded due to inactivity. "
+                    print("Models unloaded due to inactivity.  "
                           "They will reload automatically on next message.")
         except Exception as e:
             print(f"Idle watcher error: {e}")
         time.sleep(30)   # check every 30 seconds
-
 
 def background_engine() -> None:
     """
@@ -274,7 +295,6 @@ def background_engine() -> None:
     config_path = cfg.CONFIG_PATH
     last_mtime: float | None = None
     print("Background config watcher started.")
-
     while True:
         try:
             if os.path.exists(config_path):
@@ -289,7 +309,6 @@ def background_engine() -> None:
         except Exception as e:
             print(f"Background engine error: {e}")
             time.sleep(10)
-
 
 # ---------------------------------------------------------------------------
 # Main
@@ -352,7 +371,6 @@ def main() -> None:
     # If we reach here, the window was closed — terminate everything.
     print("Application window closed. Exiting.")
     os._exit(0)
-
 
 if __name__ == "__main__":
     main()
