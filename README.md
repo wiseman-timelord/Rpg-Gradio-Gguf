@@ -290,7 +290,7 @@ Test input 2 for 2 Agents: `Well it is early, but do you two have any plans yet,
 
 ### Development
 The current plan for work featured is...
-- Could do with, upon clicking "Send Input", then temporary replacing Your Message box with dynamic flow diagram of current prompting stages, and then when the send input button re-appears, hide the flow diagram and make visible "Your Message" box when it is the user's turn to produce input again. So it would follow the same visibility switches as the visibility of, Send Message and Cancel Response, buttons.
+- Whenever the Interactions panel is displayed, it needs to check it has the correct display of these elements for the state in the prompting, before it draws the display. So strictly it should be showing either, `Your Message box and Send Message button` or `Workflow Progress box and Cancel Response button`, not all 4 elements at once. This is happening when I switch to Happenings or PErsonailze, then back to Interactions.
 - Could do with a Info/Debug page to show if the model is loaded and possibly a runonce on page load System Ram usage assessment.
 
 ## DISCLAIMER:
