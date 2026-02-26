@@ -678,6 +678,46 @@ def launch_gradio_interface() -> str | None:
     }
     """
 
+    _ZOOM_HEAD_JS = """
+    <script>
+    (function() {
+        // Function to attach zoom listener
+        function enableZoom() {
+            let zoomLevel = 1.0;
+            const minZoom = 0.5;
+            const maxZoom = 2.0;
+            const step = 0.1;
+
+            window.addEventListener('wheel', function(e) {
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    e.stopPropagation();  // Stop Gradio's internal handlers from interfering
+
+                    if (e.deltaY < 0) {
+                        zoomLevel = Math.min(maxZoom, zoomLevel + step);
+                    } else {
+                        zoomLevel = Math.max(minZoom, zoomLevel - step);
+                    }
+
+                    document.body.style.transform = 'scale(' + zoomLevel + ')';
+                    document.body.style.transformOrigin = 'top left';
+                    document.body.style.width = (100 / zoomLevel) + '%';
+                    
+                    console.log('Zoom level:', zoomLevel);  // Debug output
+                }
+            }, { capture: true, passive: false });  // Capture phase ensures we get the event first
+        }
+
+        // Run immediately if DOM already loaded, otherwise wait
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', enableZoom);
+        } else {
+            enableZoom();
+        }
+    })();
+    </script>
+    """
+
     _CUSTOM_CSS = """
 #generated_image img {
     object-fit: contain !important;
@@ -1065,6 +1105,7 @@ def launch_gradio_interface() -> str | None:
         server_name="127.0.0.1",
         js=_SPELLCHECK_JS,
         css=_CUSTOM_CSS,
+        head=_ZOOM_HEAD_JS,
     )
     print(f"Gradio server started at {local_url}")
     return local_url
