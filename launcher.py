@@ -209,10 +209,15 @@ def load_persistent_settings() -> None:
     cfg.load_config()
     # Seed session_history from default_history for the initial session
     cfg.session_history = cfg.default_history
+    
+    # FIX: Ensure initial state is "user's turn" so Interactions panel loads correctly
+    if cfg.user_turn_start_time is None and cfg.workflow_stage_index == -1:
+        cfg.user_turn_start_time = time.time()
+    
     print(
-        f"  Agent 1: {cfg.agent1_name} | Agent 2: {cfg.agent2_name} | "
-        f"Human: {cfg.human_name} | "
-        f"Threads: {cfg.optimal_threads} | VRAM: {cfg.vram_assigned} MB"
+        f"  Agent 1: {cfg.agent1_name} | Agent 2: {cfg.agent2_name} |  "
+        f"Human: {cfg.human_name} |  "
+        f"Threads: {cfg.optimal_threads} | VRAM: {cfg.vram_assigned} MB "
     )
 
 
