@@ -217,7 +217,7 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 - Python - 3.10-3.12 Only
 - Powershell - 5.1+ (built in to windows 10/11)
 - CPU - Any x64 Cpu, the more threads the better. Testing was done on 20/24 threads. 
-- RAM - Enough to cover the models we are using, see Models section.
+- RAM - Enough VRam to cover the models we are using, program will put overflow layers into SRam.
 - GPU - Vulkan capable GPU Only, it uses vulkan. Also install the latest Vulkan SDK, that your GPU/OS supports.
 - Internet - Installer requires internet, main program will be offline. 
 
