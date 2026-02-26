@@ -100,7 +100,7 @@ DEFAULT_CONFIG = {
     "image_size":      "512x256",
     "image_steps":     4,
     "sample_method":   "euler",
-    "cfg_scale":       2.0,
+    "cfg_scale":       1.0,
     "negative_prompt": "",
 
     # --- Hardware / threading ---
