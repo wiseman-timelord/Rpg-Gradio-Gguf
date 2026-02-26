@@ -1,5 +1,5 @@
 # Rpg-Gradio-Gguf
-- Status: Working - Still some planned expansion/improvements, and deep testing/improvement, but for now its working quite well. I did a quick-fix for the dymanic progress/buttons for v2.16.
+- Status: Working - Still some planned expansion/improvements, and deep testing/improvement, but for now its working quite well. 
 
 ### Description
 Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf models to simulate limitless roleplaing in a Gradio interface in Web-Browser interface.
