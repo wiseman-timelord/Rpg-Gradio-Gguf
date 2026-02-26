@@ -291,7 +291,8 @@ Test input 2 for 2 Agents: `Well it is early, but do you two have any plans yet,
 
 ### Development
 The current plan for work featured is...
-- Whenever the Interactions panel is displayed, it needs to check it has the correct display of these elements for the state in the prompting, before it draws the display. So strictly it should be showing either, `Your Message box and Send Message button` or `Workflow Progress box and Cancel Response button`, not all 4 elements at once. This is happening when I switch to Happenings or PErsonailze, then back to Interactions.
+- Need to reimplement dynamic hidden/visible versions of boxes/buttons. Interactions panel deeds to have dynamic hidden/visible settings for, Your Input, Rotation Progress, Send Input, Cancel Input. So strictly it should be showing either, `Your Message box and Send Message button` or `Workflow Progress box and Cancel Response button`, appropriately for the phase. Same Phases used for progress indication should be used for determening cases of visible/hidden, of the relevant buttons/boxes at the point of drawing the Interactions panel.
+- The Starting Narrative should be the first line in the session log. It should show sright at the start. Either that or Interactions and Happenings needs to be on the same panel.
 - Could do with a Info/Debug page to show, if the model is loaded, and other useful globals in configure for debugging.
 - Need to work on prompting. If debug mode is on, so as for the Command Prompt to be open in the background (see batch), then whenever there is a prompt to the model, then the full prompt should be printed in text to the Command Prompt. I think key features are missing from instace, or the details are being incorrectly presented. USer gender and Agent roles, does not seem to be present in instance prompt, causing character outfits to become meaningless, and therefore character presentation to be inconsistent.
 
