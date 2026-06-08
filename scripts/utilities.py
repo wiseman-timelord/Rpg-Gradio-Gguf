@@ -539,14 +539,21 @@ def _detect_gpus_nvidia_smi_only() -> list[dict]:
 
 
 def _detect_gpus_vulkaninfo() -> list[dict]:
-    """Build GPU list from vulkaninfo --summary (AMD / Intel / any Vulkan)."""
-    output = _run_cmd(["vulkaninfo", "--summary"])
-    if not output:
+    """
+    Build GPU list from ``vulkaninfo --summary`` (AMD / Intel / any Vulkan).
+
+    Also attempts to read device-local heap size from the full
+    ``vulkaninfo`` output (no --summary flag) to fill in VRAM figures
+    for non-NVIDIA cards, since WMIC frequently reports 0 MB for AMD.
+    """
+    # --- Pass 1: names from --summary -----------------------------------
+    summary = _run_cmd(["vulkaninfo", "--summary"])
+    if not summary:
         return []
 
     gpus: list[dict] = []
     idx = 0
-    for line in output.splitlines():
+    for line in summary.splitlines():
         ll = line.lower()
         if "devicename" in ll or "device name" in ll:
             name = (
@@ -557,9 +564,105 @@ def _detect_gpus_vulkaninfo() -> list[dict]:
             gpus.append({"index": idx, "name": name, "vram_mb": 0})
             idx += 1
 
-    if gpus:
-        print(f"Detected {len(gpus)} GPU(s) via vulkaninfo.")
+    if not gpus:
+        return []
+
+    print(f"Detected {len(gpus)} GPU(s) via vulkaninfo.")
+
+    # --- Pass 2: VRAM from full vulkaninfo output -----------------------
+    # The full output groups devices with sections like:
+    #   GPU id : 0 (Radeon RX 470 Series)
+    #   ...
+    #   VkPhysicalDeviceMemoryProperties:
+    #     memoryHeaps: count = 2
+    #       memoryHeaps[0]:
+    #         size   = 8573157376 (8.0 GiB)   ← device-local heap
+    #         flags  = 0x00000001 (DEVICE_LOCAL_BIT)
+    full = _run_cmd(["vulkaninfo"], timeout=20)
+    if full:
+        _enrich_vulkaninfo_vram(gpus, full)
+
     return gpus
+
+
+def _enrich_vulkaninfo_vram(gpus: list[dict], full_output: str) -> None:
+    """
+    Parse full ``vulkaninfo`` output to find device-local heap sizes and
+    update matching GPU entries in *gpus* in-place.
+
+    This is necessary because AMD and Intel cards are not covered by
+    nvidia-smi, and WMIC caps or misreports their AdapterRAM values.
+    """
+    lines = full_output.splitlines()
+    current_gpu_name: str | None = None
+    in_memory_props: bool = False
+    in_heap: bool = False
+    heap_flags_seen: bool = False
+
+    # Temporary store: name → best (largest device-local) heap size in MB
+    vram_by_name: dict[str, int] = {}
+    current_heap_size_mb: int = 0
+
+    for line in lines:
+        stripped = line.strip()
+        ll = stripped.lower()
+
+        # Detect GPU section header:  "GPU id : 0 (Radeon RX 470 Series)"
+        m = re.match(r"GPU\s+id\s*[=:]\s*\d+\s*\((.+?)\)", stripped, re.IGNORECASE)
+        if m:
+            current_gpu_name = m.group(1).strip()
+            in_memory_props = False
+            in_heap = False
+            continue
+
+        if current_gpu_name is None:
+            continue
+
+        # Detect memory properties section
+        if "vkphysicaldevicememoryproperties" in ll:
+            in_memory_props = True
+            in_heap = False
+            continue
+
+        if not in_memory_props:
+            continue
+
+        # Detect heap entry
+        if re.search(r"memoryheaps\[\d+\]", ll):
+            in_heap = True
+            heap_flags_seen = False
+            current_heap_size_mb = 0
+            continue
+
+        if not in_heap:
+            continue
+
+        # Read heap size
+        size_m = re.search(r"size\s*=\s*(\d+)", stripped)
+        if size_m:
+            current_heap_size_mb = int(size_m.group(1)) // (1024 * 1024)
+            continue
+
+        # Read heap flags — we only want DEVICE_LOCAL heaps
+        if "flags" in ll and "device_local" in ll:
+            heap_flags_seen = True
+            # Record the largest device-local heap for this GPU
+            prev = vram_by_name.get(current_gpu_name, 0)
+            if current_heap_size_mb > prev:
+                vram_by_name[current_gpu_name] = current_heap_size_mb
+            continue
+
+    # Apply collected VRAM values back to the gpu list
+    for gpu in gpus:
+        gpu_lower = gpu["name"].lower()
+        for vk_name, vram_mb in vram_by_name.items():
+            vk_lower = vk_name.lower()
+            if vk_lower in gpu_lower or gpu_lower in vk_lower:
+                if vram_mb > gpu["vram_mb"]:
+                    print(f"  vulkaninfo VRAM for '{gpu['name']}': "
+                          f"{gpu['vram_mb']} MB → {vram_mb} MB")
+                    gpu["vram_mb"] = vram_mb
+                break
 
 
 # ---------------------------------------------------------------------------
@@ -574,31 +677,84 @@ def detect_gpus() -> list[dict]:
     Detection strategy
     ------------------
     Windows (primary path):
-      1. WMIC win32_VideoController — enumerates every adapter registered
-         with Windows, including integrated GPUs, secondary discrete cards,
-         and any GPU not supported by nvidia-smi (AMD, Intel Arc, etc.).
-      2. nvidia-smi — used only to correct the VRAM figures for NVIDIA
-         entries, because WMIC hard-caps AdapterRAM at ~4 GB regardless of
-         actual VRAM.
+      1. WMIC win32_VideoController — enumerates adapters registered with
+         Windows.  On Windows 10 this can miss secondary/passive discrete
+         cards that have no active display output (e.g. an AMD RX 470 in
+         compute/passive mode alongside an NVIDIA primary GPU).
+      2. vulkaninfo — enumerates every Vulkan-capable physical device
+         regardless of display connection, which catches passive AMD/Intel
+         cards that WMIC omits.  Both lists are merged by name so that
+         cards appearing in both are not duplicated.
+      3. nvidia-smi — corrects VRAM for any NVIDIA entries (WMIC caps
+         AdapterRAM at ~4 GB).
+      4. vulkaninfo VRAM enrichment — corrects VRAM for AMD/Intel entries
+         (WMIC frequently reports 0 MB or the 4 GB cap for these).
 
-    Fallback (non-Windows or WMIC failure):
-      3. nvidia-smi alone
-      4. vulkaninfo --summary
+    Fallback (non-Windows or all Windows methods fail):
+      5. nvidia-smi alone
+      6. vulkaninfo alone
     """
     if platform.system() == "Windows":
-        # Primary: WMIC gives us the full picture
+        # Step 1 — WMIC primary list
         gpus = _detect_gpus_wmic()
+
+        # Step 2 — vulkaninfo supplemental list (catches passive AMD cards)
+        vk_gpus = _detect_gpus_vulkaninfo()
+
+        if vk_gpus:
+            if not gpus:
+                # WMIC returned nothing — use vulkaninfo list entirely
+                gpus = vk_gpus
+            else:
+                # Merge: add any vulkaninfo GPU whose name doesn't already
+                # appear in the WMIC list.  Re-index after merging.
+                existing_names = {g["name"].lower() for g in gpus}
+                added = 0
+                for vkg in vk_gpus:
+                    vk_lower = vkg["name"].lower()
+                    # Check for substring match to handle slight name differences
+                    already_present = any(
+                        vk_lower in ex or ex in vk_lower
+                        for ex in existing_names
+                    )
+                    if not already_present:
+                        gpus.append({"index": len(gpus), "name": vkg["name"],
+                                     "vram_mb": vkg["vram_mb"]})
+                        existing_names.add(vk_lower)
+                        added += 1
+                        print(f"  Added GPU from vulkaninfo (not in WMIC): "
+                              f"'{vkg['name']}'")
+                # Fix indices after merge
+                for i, g in enumerate(gpus):
+                    g["index"] = i
+                if added:
+                    print(f"  Total after merge: {len(gpus)} GPU(s).")
+
+                # Also apply vulkaninfo VRAM to any AMD/Intel entries that
+                # WMIC misreported (0 MB or the ~4096 MB cap).
+                for gpu in gpus:
+                    if gpu["vram_mb"] in (0, 4096, 4095):
+                        for vkg in vk_gpus:
+                            vk_lower = vkg["name"].lower()
+                            gpu_lower = gpu["name"].lower()
+                            if vk_lower in gpu_lower or gpu_lower in vk_lower:
+                                if vkg["vram_mb"] > gpu["vram_mb"]:
+                                    print(f"  Corrected VRAM for '{gpu['name']}': "
+                                          f"{gpu['vram_mb']} MB → {vkg['vram_mb']} MB "
+                                          f"(from vulkaninfo).")
+                                    gpu["vram_mb"] = vkg["vram_mb"]
+                                break
+
         if gpus:
-            _enrich_with_nvidia_smi(gpus)   # fix up NVIDIA VRAM in-place
+            # Step 3 — fix NVIDIA VRAM (nvidia-smi is authoritative for NVIDIA)
+            _enrich_with_nvidia_smi(gpus)
             return gpus
-        # WMIC produced nothing — try NVIDIA-only path
+
+        # All Windows methods failed — try NVIDIA-only fallback
         gpus = _detect_gpus_nvidia_smi_only()
         if gpus:
             return gpus
-        # Last resort
-        gpus = _detect_gpus_vulkaninfo()
-        if gpus:
-            return gpus
+
     else:
         # Linux / macOS
         gpus = _detect_gpus_nvidia_smi_only()
