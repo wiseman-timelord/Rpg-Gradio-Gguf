@@ -211,7 +211,7 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
     
 </details>
 
-### Requirements
+### Hard Requirements
 - Architecture - 64-Bit compatible processors/packages only.
 - Windows - Windows 10(b1809+)-11
 - Python - 3.10-3.12 Only
@@ -221,6 +221,12 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 - GPU - Vulkan capable GPU Only, it uses vulkan. Also install the latest Vulkan SDK, that your GPU/OS supports.
 - Internet - Installer requires internet, main program will be offline. 
 - Compiling - The installer will detect/use VC Build Tools 2019-2022.
+
+### Building Requirements 
+For compile options; If on PATH, ask AI how to check its on path, and as applicable fix...
+- [MSVC++ 2019-2022](https://visualstudio.microsoft.com/vs/older-downloads/) - MSVC with option Desktop Development enabled.
+- [Git](https://git-scm.com/install/) - Github Program for cloning the sources from github, ensure its on PATH.
+- [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) - Need the Vulkan SDK to build for Vulkan.
 
 ### Models
 Here is some info about the modesls...
