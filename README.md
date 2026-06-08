@@ -220,6 +220,7 @@ Its a Chatbot with, text and image, generation, tuned to RPG, that uses Gguf mod
 - RAM - Enough VRam to cover the models we are using, program will put overflow layers into SRam.
 - GPU - Vulkan capable GPU Only, it uses vulkan. Also install the latest Vulkan SDK, that your GPU/OS supports.
 - Internet - Installer requires internet, main program will be offline. 
+- Compiling - The installer will detect/use VC Build Tools 2019-2022.
 
 ### Models
 Here is some info about the modesls...
